@@ -29,10 +29,11 @@
     
     BMessageSection * section = [self sectionForDate:message.date];
     if (!section) {
-        NSString * messageDate = [_dateFormatter stringFromDate:message.date];
-        section = [[BMessageSection alloc] initWithDateText:messageDate];
-        [_messageSections addObject:section];
-        [self sortMessageSections];
+        return nil;
+//        NSString * messageDate = [_dateFormatter stringFromDate:message.date];
+//        section = [[BMessageSection alloc] initWithDateText:messageDate];
+//        [_messageSections addObject:section];
+//        [self sortMessageSections];
     }
     messageIndex = [section addMessage:message];
     sectionIndex = [_messageSections indexOfObject:section];
@@ -104,7 +105,9 @@
 -(NSArray<NSIndexPath *> *) indexPathsForMessages: (NSArray<PMessage> *) messages {
     NSMutableArray<NSIndexPath *> * indexPaths = [NSMutableArray new];
     for (id<PMessage> message in messages) {
-        [indexPaths addObject:[self indexPathForMessage:message]];
+        if ([self indexPathForMessage:message]) {
+            [indexPaths addObject:[self indexPathForMessage:message]];
+        }
     }
     return indexPaths;
 }
