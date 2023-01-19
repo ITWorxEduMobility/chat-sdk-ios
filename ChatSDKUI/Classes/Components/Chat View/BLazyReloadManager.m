@@ -13,11 +13,15 @@
 @synthesize tableView = _tableView;
 @synthesize messageManager = _messageManager;
 @synthesize loadingMoreMesssages = _loadingMoreMesssages;
+@synthesize lastMessageCount = _lastMessageCount;
+@synthesize shouldLoadMore = _shouldLoadMore;
 
 -(instancetype) initWithTableView: (UITableView *) tableView messageManager: (BMessageManager *) messageManager {
     if((self = [super init])) {
         _tableView = tableView;
         _messageManager = messageManager;
+        _lastMessageCount = 0;
+        _shouldLoadMore = YES;
     }
     return self;
 }

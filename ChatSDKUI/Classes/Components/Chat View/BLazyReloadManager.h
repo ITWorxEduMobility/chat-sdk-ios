@@ -33,6 +33,8 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, weak, readonly) UITableView * tableView;
 @property (nonatomic, weak, readonly) BMessageManager * messageManager;
 @property (nonatomic, readwrite) BOOL loadingMoreMesssages;
+@property (nonatomic, readwrite) int lastMessageCount;
+@property (nonatomic, readwrite) BOOL shouldLoadMore;
 
 -(instancetype) initWithTableView: (UITableView *) tableView messageManager: (BMessageManager *) messageManager;
 -(void) scrollViewDidScroll: (UIScrollView *) scrollView;
