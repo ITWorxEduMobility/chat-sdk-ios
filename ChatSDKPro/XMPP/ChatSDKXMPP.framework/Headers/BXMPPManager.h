@@ -7,9 +7,12 @@
 //
 
 #import <Foundation/Foundation.h>
-#import "XMPP.h"
-#import "XMPPCapabilities.h"
-#import "XMPPMessageCarbons.h"
+
+//#import "XMPP.h"
+//#import "XMPPCapabilities.h"
+//#import "XMPPMessageCarbons.h"
+
+#import <ChatSDKVendor/XMPPFramework.h>
 
 
 @class XMPPReconnect;
@@ -54,6 +57,10 @@
 
 #define bHookXMPPSetupStream @"bHookXMPPSetupStream"
 #define bHookXMPPTeardownStream @"bHookXMPPTeardownStream"
+#define bXMPPErrorStanza @"xmpp-error-stanza"
+
+#define bHookXMPPRosterItemReceived @"bHookXMPPRosterItemReceived"
+#define bHook_NSXMLElement @"bHook_NSXMLElement"
 
 typedef void(^Completion)(void);
 
@@ -103,7 +110,7 @@ typedef void(^Completion)(void);
     PubSubManager * _pubSubManager;
     UserResourceTracker * _userResourceTracker;
 //    JingleListener * _jingleListener;
-        
+    
 }
 
 @property (nonatomic, readonly) XMPPStream * stream;
@@ -132,6 +139,7 @@ typedef void(^Completion)(void);
 @property (nonatomic, readonly) EntityTimeManager * entityTimeManager;
 @property (nonatomic, readonly) CapabilitiesListener * capabilitiesListener;
 @property (nonatomic, readonly) PrivacyLists * privacyLists;
+
 
 @property (nonatomic, readonly) dispatch_queue_t xmppDispatchQueue;
 
@@ -162,6 +170,9 @@ typedef void(^Completion)(void);
 
 -(void) reconnect;
 -(void) softReconnect;
+//-(void) logout;
+
+-(BOOL) isLive;
 
 -(void) setDeliveryReceiptsEnabled: (BOOL) enabled;
 -(void) setReadReceiptsEnabled: (BOOL) enabled;
@@ -173,7 +184,7 @@ typedef void(^Completion)(void);
 -(nonnull RXPromise *) sendXMPPMessage: (XMPPMessage *) xmppMessage thread: (id<PThread>) thread;
 -(RXPromise *) joinExistingGroupChats;
 
--(void) updateLastOnlineTime;
--(NSDate *) lastOnlineTime;
+//-(void) updateLastOnlineTime;
+//-(NSDate *) lastOnlineTime;
 
 @end

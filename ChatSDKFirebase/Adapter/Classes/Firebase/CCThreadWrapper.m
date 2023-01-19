@@ -10,6 +10,7 @@
 
 #import <ChatSDKFirebase/FirebaseAdapter.h>
 #import <ChatSDK/Core.h>
+#import <ChatSDKFirebase/ChatSDKFirebase-Swift.h>
 
 @implementation CCThreadWrapper
 
@@ -36,10 +37,10 @@
     return self;
 }
 
--(RXPromise *) on {
+-(RXPromise *) doOn {
     
     RXPromise * promise = [RXPromise new];
-
+    
     if (((NSManagedObject *)_model).on) {
         [promise resolveWithResult:self];
         return promise;
@@ -54,7 +55,10 @@
             // Update the thread
             [self deserialize:snapshot.value];
             [promise resolveWithResult:self];
-
+            
+            [self messagesOn];
+            [self usersOn];
+            [self permissionsOn];
         }
         else {
             [promise rejectWithReason:Nil];
@@ -68,6 +72,12 @@
     return promise;
 }
 
+-(RXPromise *) on {
+    return [self myPermission].thenOnMain(^id(id success) {
+        return [self doOn];
+    }, nil);
+}
+
 -(void) off {
     
     ((NSManagedObject *)_model).on = NO;
@@ -77,6 +87,7 @@
     
     [self messagesOff];
     [self usersOff];
+    [self permissionsOff];
     
     if(BChatSDK.typingIndicator) {
         [BChatSDK.typingIndicator typingOff: self.model];
@@ -133,6 +144,8 @@
             query = [query queryLimitedToLast:BChatSDK.config.messageHistoryDownloadLimit];
         }
         
+        [query keepSynced:NO];
+        
         dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_BACKGROUND, 0), ^{
             [query observeEventType:FIRDataEventTypeChildAdded withBlock:^(FIRDataSnapshot * snapshot) {
 
@@ -149,34 +162,42 @@
                         [BHookNotification notificationThreadAdded:self.model];
                     }
                     
+                    // If the firebase rules are set up so there is a permission denied error, it can be that
+                    // this is called locally before the data has actually been written. If we are sending a message
+                    // this can cause an issue because added and then removed callbacks are called immediately afterards
+                    // and that messes up the resend functionality. If the message state is sending, we ignore...
+                    id<PMessage> message = [BChatSDK.db fetchEntityWithID:snapshot.key withType:bMessageEntity];
+                    if (message && message.messageSendStatus == bMessageSendStatusSending ) {
+                        return;
+                    }
+                    
                     // This gets the message if it exists and then updates it from the snapshot
-                    CCMessageWrapper * message = [CCMessageWrapper messageWithSnapshot:snapshot];
+                    CCMessageWrapper * wrapper = [FirebaseNetworkAdapterModule.shared.firebaseProvider messageWrapperWithSnapshot:snapshot];
                     
-                    
-                    BOOL newMessage = message.model.isDelivered == NO;
+                    BOOL newMessage = wrapper.model.isDelivered == NO;
                     
                     // Is this a new message?
                     // When a message arrives we add it to the database
                     //newMessage = [BChatSDK.db fetchEntityWithID:snapshot.key withType:bMessageEntity] == Nil;
                     
                     // Mark the message as delivered
-                    [message.model setDelivered: @YES];
+                    [wrapper.model setDelivered: @YES];
                     
                     // Add the message to this thread;
-                    [self.model addMessage:message.model];
+                    [self.model addMessage:wrapper.model];
                     
-                    NSLog(@"Message: %@", message.model.text);
+                    NSLog(@"Message: %@", wrapper.model.text);
                     
                     [BChatSDK.core save];
 
                     if (newMessage) {
                         dispatch_async(dispatch_get_main_queue(), ^{
-                            [BHookNotification notificationMessageReceived: message.model];
+                            [BHookNotification notificationMessageReceived: wrapper.model];
                         });
                     }
                     
                     // Mark the message as received
-                    [message markAsReceived];
+                    [wrapper markAsReceived];
                     
                     if(BChatSDK.readReceipt) {
                         [BChatSDK.readReceipt updateReadReceiptsForThread:self.model];
@@ -195,26 +216,64 @@
         
         if (BChatSDK.config.messageDeletionEnabled) {
             query = [FIRDatabaseReference threadMessagesRef:self.model.entityID];
-    //        [query queryOrderedByChild:bDate];
-            
-            // Only add deletion handlers to the last 100 messages
-    //        query = [query queryLimitedToLast:BChatSDK.config.messageDeletionListenerLimit];
-            
+                     
+            NSDate * date = nil;
+
+            // Get the messages
+            int limit = BChatSDK.config.messageDeletionListenerLimit;
+            if (limit < 0) {
+                [self.model setCanDeleteMessagesFromDate:[NSDate dateWithTimeIntervalSince1970:0]];
+            } else {
+                query = [query queryOrderedByChild:bDate];
+
+                NSArray<PMessage> * messages = self.model.messagesOrderedByDateNewestFirst;
+                id<PMessage> earliestMessage = nil;
+
+                if (messages.count > limit) {
+                    earliestMessage = messages[limit];
+                } else if (messages.count > 0) {
+                    earliestMessage = messages.lastObject;
+                }
+                
+                if (earliestMessage) {
+                    date = earliestMessage.date;
+                }
+                
+                if(date) {
+                    query = [query queryStartingAtValue:@(date.timeIntervalSince1970 - 1000)];
+                    [self.model setCanDeleteMessagesFromDate:date];
+                } else {
+                    [self.model setCanDeleteMessagesFromDate:[NSDate date]];
+                }
+
+            }
+                        
             // This will potentially delete all the messages
             [query observeEventType:FIRDataEventTypeChildRemoved withBlock:^(FIRDataSnapshot * snapshot) {
-//                NSLog(@"Message deleted: %@", snapshot.value);
-                CCMessageWrapper * wrapper = [CCMessageWrapper messageWithSnapshot:snapshot];
-                id<PMessage> message = wrapper.model;
-                NSString * entityID = message.entityID;
-                [BHookNotification notificationMessageWillBeDeleted: message];
-                [self.model removeMessage: message];
-                [BHookNotification notificationMessageWasDeleted:entityID];
+
+                // If the firebase rules are set up so there is a permission denied error, it can be that
+                // this is called locally before the data has actually been written. If we are sending a message
+                // this can cause an issue because added and then removed callbacks are called immediately afterards
+                // and that messes up the resend functionality. If the message state is sending, we ignore...
+                id<PMessage> message = [BChatSDK.db fetchEntityWithID:snapshot.key withType:bMessageEntity];
+                if (message && message.messageSendStatus == bMessageSendStatusSending) {
+                    return;
+                }
+
+                [self removeMessage:message];
             }];
         }
 
         return promise;
         
     }, Nil);
+}
+
+-(void) removeMessage: (id<PMessage>) message {
+    NSString * entityID = message.entityID;
+    [BHookNotification notificationMessageWillBeDeleted: message];
+    [self.model removeMessage: message];
+    [BHookNotification notificationMessageWasDeleted:entityID];
 }
 
 -(void) messagesOff {
@@ -238,19 +297,28 @@
     [threadUsersRef observeEventType:FIRDataEventTypeChildAdded withBlock:^(FIRDataSnapshot * snapshot) {
         if (![snapshot.value isEqual: [NSNull null]]) {
             // Update the thread
-            CCUserWrapper * user = [CCUserWrapper userWithSnapshot:snapshot];
+            CCUserWrapper * user = [FirebaseNetworkAdapterModule.shared.firebaseProvider userWrapperWithSnapshot:snapshot];
             [self.model addUser:user.model];
             [user metaOn];
             [BHookNotification notificationThreadUsersUpdated:self.model];
         }
     }];
     
+    [threadUsersRef observeEventType:FIRDataEventTypeChildRemoved withBlock:^(FIRDataSnapshot * snapshot) {
+        if (![snapshot.value isEqual: [NSNull null]]) {
+            // Update the thread
+            CCUserWrapper * user = [FirebaseNetworkAdapterModule.shared.firebaseProvider userWrapperWithSnapshot:snapshot];
+            [self.model removeUser:user.model];
+            [BHookNotification notificationThreadUsersUpdated:self.model];
+        }
+    }];
+
     [threadUsersRef observeEventType:FIRDataEventTypeValue withBlock:^(FIRDataSnapshot * snapshot) {
         if (![snapshot.value isEqual: [NSNull null]]) {
             for(NSString * userEntityID in [snapshot.value allKeys]) {
                 if(snapshot.value[userEntityID][bDeletedKey]) {
                     // Update the thread
-                    CCUserWrapper * user = [CCUserWrapper userWithEntityID:userEntityID];
+                    CCUserWrapper * user = [FirebaseNetworkAdapterModule.shared.firebaseProvider userWrapperWithEntityID:userEntityID];
                     if (self.model.type.intValue ^ bThreadType1to1) {
                         [self.model removeUser:user.model];
                         [BHookNotification notificationThreadUsersUpdated:self.model];
@@ -267,20 +335,12 @@
         }
     }];
     
-    [threadUsersRef observeEventType:FIRDataEventTypeChildRemoved withBlock:^(FIRDataSnapshot * snapshot) {
-        if (![snapshot.value isEqual: [NSNull null]]) {
-            // Update the thread
-            CCUserWrapper * user = [CCUserWrapper userWithSnapshot:snapshot];
-            [self.model removeUser:user.model];
-            [BHookNotification notificationThreadUsersUpdated:self.model];
-        }
-    }];
 }
 
 -(void) usersOff {
     [((NSManagedObject *)_model) setPath:bUsersPath on:NO];
     for(id<PUser> user in _model.users) {
-        [[CCUserWrapper userWithModel:user.model] off];
+        [[FirebaseNetworkAdapterModule.shared.firebaseProvider userWrapperWithModel:user] off];
     }
     [[FIRDatabaseReference threadUsersRef:self.entityID] removeAllObservers];
 }
@@ -366,7 +426,7 @@
         [BHookNotification notificationThreadRemoved:_model];
         
         // Otherwise we just remove the user
-        return [self removeUser:[CCUserWrapper userWithModel:currentUser]];
+        return [self removeUser:[FirebaseNetworkAdapterModule.shared.firebaseProvider userWrapperWithModel:currentUser]];
     }
 }
 
@@ -428,12 +488,19 @@
 -(NSDictionary *) serialize {
     NSMutableDictionary * dict = [NSMutableDictionary new];
     [dict addEntriesFromDictionary:@{bCreationDate: [FIRServerValue timestamp],
-                                     bNameKey: [NSString safe:_model.name],
                                      bType: _model.type,
-//                                     bImageURL: [NSString safe: [_model.meta valueForKey:bImageURL]],
                                      bCreator: [NSString safe: _model.creator.entityID]}];
+
+    [dict addEntriesFromDictionary:self.serializeMeta];
     
     return dict;
+}
+
+-(NSDictionary *) serializeMeta {
+    return @{
+      bNameKey: [NSString safe:_model.name],
+      bImageURL: [NSString safe: _model.imageURL]
+    };
 }
 
 -(void) deserialize: (NSDictionary *) value {
@@ -449,10 +516,10 @@
         _model.type = type;
     }
     
-//    NSString * imageURL = value[bImageURL];
-//    if (imageURL) {
-//        [_model setMetaValue:imageURL forKey:bImageURL];
-//    }
+    NSString * imageURL = value[bImageURL];
+    if (imageURL) {
+        [_model setMetaValue:imageURL forKey:bImageURL];
+    }
 
     NSString * creatorEntityID = value[bCreator];
     
@@ -485,7 +552,9 @@
     NSDictionary * details = [self serialize];
     
     for (NSString * key in details.allKeys) {
-        [meta removeObjectForKey:key];
+        if (![key isEqual:bImageURL]) {
+            [meta removeObjectForKey:key];
+        }
     }
     
     [_model setMeta:meta];
@@ -504,6 +573,25 @@
     // Also update the meta ref - we do this for forwards compatibility
     // in the future we will move everything to the meta area
     [metaRef updateChildValues:self.serialize withCompletionBlock:^(NSError * error, FIRDatabaseReference * ref) {
+           if (!error) {
+               [promise resolveWithResult:self.model];
+           }
+           else {
+               [promise rejectWithReason:error];
+           }
+       }];
+    
+    return promise;
+}
+
+-(RXPromise *) pushMeta {
+    RXPromise * promise = [RXPromise new];
+    
+    FIRDatabaseReference * metaRef = [FIRDatabaseReference threadMetaRef:_model.entityID];
+
+    // Also update the meta ref - we do this for forwards compatibility
+    // in the future we will move everything to the meta area
+    [metaRef updateChildValues:self.serializeMeta withCompletionBlock:^(NSError * error, FIRDatabaseReference * ref) {
            if (!error) {
                [promise resolveWithResult:self.model];
            }
@@ -595,6 +683,104 @@
             return success;
         }
     }, Nil);
+}
+
+-(void) permissionsOn {
+    
+    if (((NSManagedObject *)_model).permissionsOn) {
+        return;
+    }
+    ((NSManagedObject *)_model).permissionsOn = YES;
+    
+    void(^block)(FIRDataSnapshot *) = ^(FIRDataSnapshot * snapshot) {
+        [BChatSDK.db performOnMain:^{
+            id<PUserConnection> connection = [self.model connection:snapshot.key];
+            if (connection) {
+                if (snapshot.value != [NSNull null]) {
+                    connection.role = snapshot.value;
+                } else {
+                    if (_model.creator.isMe) {
+                        connection.role = Permissions.owner;
+                    } else {
+                        connection.role = Permissions.member;
+                    }
+                }
+                
+                if ([snapshot.key isEqual:BChatSDK.currentUserID]) {
+                    [self updateListenersForPermission: connection.role];
+                }
+                
+                id<PUser> user = [BChatSDK.db fetchEntityWithID:snapshot.key withType:bUserEntity];
+                [BHookNotification notificationThreadUserRoleUpdated:self.model user:user];
+            }
+        }];
+
+    };
+
+    FIRDatabaseReference * ref = [FIRDatabaseReference threadPermissions:self.entityID];
+    [ref observeEventType:FIRDataEventTypeChildAdded withBlock:block];
+    [ref observeEventType:FIRDataEventTypeChildChanged withBlock:block];
+//    [ref observeEventType:FIRDataEventTypeChildRemoved withBlock:^(FIRDataSnapshot * snapshot) {
+//        if (snapshot.value != [NSNull null]) {
+//
+//        } else {
+//
+//        }
+//    }];
+}
+
+-(void) updateListenersForPermission: (NSString *) role {
+    if ([role isEqual:Permissions.banned]) {
+        [self messagesOff];
+        if(BChatSDK.typingIndicator) {
+            [BChatSDK.typingIndicator typingOff: self.model];
+        }
+    } else {
+        [self messagesOn];
+        if(BChatSDK.typingIndicator) {
+            [BChatSDK.typingIndicator typingOn: self.model];
+        }
+    }
+}
+
+-(RXPromise *) myPermission {
+    RXPromise * promise = [RXPromise new];
+    
+    NSString * userEntityID = BChatSDK.currentUserID;
+    
+    FIRDatabaseReference * ref = [[FIRDatabaseReference threadPermissions:self.entityID] child: userEntityID];
+    [ref observeSingleEventOfType:FIRDataEventTypeValue withBlock: ^(FIRDataSnapshot * snapshot) {
+        [BChatSDK.db performOnMain:^{
+            id<PUserConnection> connection = [self.model connection:userEntityID];
+            if (snapshot.value == [NSNull null]) {
+                connection.role = Permissions.member;
+            } else {
+                connection.role = snapshot.value;
+            }
+            [promise resolveWithResult:snapshot.value];
+        }];
+    }];
+    
+    return promise;
+}
+
+-(RXPromise *) setPermission: (NSString *) userEntityID permission: (NSString *) permission {
+    RXPromise * promise = [RXPromise new];
+    FIRDatabaseReference * ref = [[FIRDatabaseReference threadPermissions:self.entityID] child: userEntityID];
+    [ref setValue:permission withCompletionBlock:^(NSError * error, FIRDatabaseReference * ref) {
+        if (error) {
+            [promise rejectWithReason:error];
+        } else {
+            [promise resolveWithResult:nil];
+        }
+    }];
+    return promise;
+}
+
+-(void) permissionsOff {
+    ((NSManagedObject *)_model).permissionsOn = NO;
+    FIRDatabaseReference * ref = [FIRDatabaseReference threadPermissions:self.entityID];
+    [ref removeAllObservers];
 }
 
 #pragma EntityWrapper protocol

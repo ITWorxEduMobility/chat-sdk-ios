@@ -49,9 +49,10 @@ open class FileMessageContent: DefaultDownloadableMessageContent, MessageProgres
 
 
             if let imageURL = message.imageURL() {
-                 _view.imageView.sd_setImage(with: imageURL, completed: nil)
-             } else if let name = message.messageText() as NSString? {
-                 let ext = name.pathExtension.lowercased()
+                _view.imageView.sd_setImage(with: imageURL, placeholderImage: image)
+             } else if let ext = message.fileURL()?.pathExtension {
+
+//                 let ext = name.pathExtension.lowercased()
                  let imageName = "file-type-" + ext
                 
                 if ext == "png" || ext == "jpg" || ext == "jpeg" {

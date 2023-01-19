@@ -20,7 +20,6 @@
  * @brief Create a new thread with a thread data model
  */
 +(CCThreadWrapper *) threadWithModel: (id<PThread>) model;
-
 /**
  * @brief Retrieve or create a thread with an entity ID
  */
@@ -60,6 +59,7 @@
  * @brief Update/create the thread entity on the server with the thread's current meta data
  */
 -(RXPromise *) push;
+-(RXPromise *) pushMeta;
 
 /**
  * @brief Add a new user to this thread - if there's an error adding the user to the thread or the thread to the user, the whole data change is rolled back
@@ -97,5 +97,9 @@
 -(void) markRead;
 
 -(RXPromise *) setMuted: (BOOL) muted;
+
+-(void) removeMessage: (id<PMessage>) message;
+
+-(RXPromise *) setPermission: (NSString *) userEntityID permission: (NSString *) permission;
 
 @end

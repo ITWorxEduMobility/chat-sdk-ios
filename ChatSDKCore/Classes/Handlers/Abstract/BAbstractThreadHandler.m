@@ -16,7 +16,7 @@
 -(RXPromise *) sendMessageWithText:(NSString *)text withThreadEntityID:(NSString *)threadID withMetaData: (NSDictionary *)meta {
     
     // Set the URLs for the images and save it in CoreData
-    [BChatSDK.db beginUndoGroup];
+//    [BChatSDK.db beginUndoGroup];
     
     id<PMessage> message = [[[[BMessageBuilder textMessage:text] meta:meta] thread:threadID] build];
     return [self sendMessage:message];
@@ -123,12 +123,12 @@
                        threadCreated: (void(^)(NSError * error, id<PThread> thread)) threadCreated {
     return [self createThreadWithUsers:users
                                   name:name
+                              imageURL: nil
                                   type:bThreadTypeNone
                               entityID:nil
                            forceCreate:force
                          threadCreated:threadCreated];
 }
-
 
 -(RXPromise *) createThreadWithUsers: (NSArray *) users
                                 name: (NSString *) name
@@ -137,6 +137,23 @@
                                   name:name
                            forceCreate:NO
                          threadCreated:threadCreated];
+
+}
+
+-(RXPromise *) createThreadWithUsers: (NSArray *) users
+                                name: (NSString *) name
+                               imageURL: (NSString *) imageURL
+                       threadCreated: (void(^)(NSError * error, id<PThread> thread)) threadCreated {
+
+    return [self createThreadWithUsers:users
+                                  name:name
+                              imageURL:imageURL
+                                  type:bThreadTypeNone
+                              entityID:nil
+                           forceCreate:NO
+                         threadCreated:threadCreated];
+
+
 }
 
 -(RXPromise *) createThreadWithUsers: (NSArray *) users
@@ -198,7 +215,7 @@
 
 -(RXPromise *) leaveThread: (id<PThread>) thread {
     id<PUser> user = BChatSDK.currentUser;
-    return [self removeUsers:@[user] fromThread:thread];
+    return [self removeUsers:@[user.entityID] fromThread:thread.entityID];
 }
 
 -(RXPromise *) joinThread: (id<PThread>) thread {
@@ -305,13 +322,21 @@
     return [RXPromise resolveWithResult:Nil];
 }
 
+-(RXPromise *) pushThreadMeta: (NSString *) threadEntityID {
+    return [RXPromise resolveWithResult:nil];
+}
+
 -(BOOL) canMuteThreads {
+    return false;
+}
+
+-(BOOL) canEditThread: (NSString *) threadEntityID {
     return false;
 }
 
 -(RXPromise *) replyToMessage: (id<PMessage>) message withThreadID: (NSString *) threadEntityID reply: (NSString *) reply {
     
-    [BChatSDK.db beginUndoGroup];
+//    [BChatSDK.db beginUndoGroup];
 
     BMessageBuilder * builder = [[BMessageBuilder textMessage: @""] thread:threadEntityID];
     
@@ -350,7 +375,7 @@
 }
 
 -(RXPromise *) forwardMessage: (id<PMessage>) message toThreadWithID: (NSString *) threadEntityID {
-    [BChatSDK.db beginUndoGroup];
+//    [BChatSDK.db beginUndoGroup];
     id<PMessage> newMessage = [[[[BMessageBuilder withType:message.type.intValue] meta:message.meta] thread:threadEntityID] build];
     return [self sendMessage:newMessage];
 }
@@ -424,6 +449,14 @@
 }
 
 -(BOOL) canJoinThread: (id<PThread>) thread {
+    return NO;
+}
+
+-(RXPromise *) refreshRoles: (NSString *) threadEntityID {
+    return [RXPromise resolveWithResult:nil];
+}
+
+-(BOOL) threadImagesSupported {
     return NO;
 }
 

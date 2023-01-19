@@ -22,6 +22,9 @@ typedef enum {
     bMessageTypeSticker = 6,
     bMessageTypeFile = 7,
     bMessageTypeBase64Image = 8,
+    bMessageTypeSnap = 9,
+    bMessageTypeContact = 10,
+    bMessageTypeGif = 11,
     bMessageTypeSilent = 98,
     bMessageTypeCustom = 99,
 } bMessageType;
@@ -40,6 +43,14 @@ typedef enum {
     bMessageActionUserJoinedGroup = 3,
 } bMessageAction;
 
+typedef enum {
+    bMessageSendStatusNone = 0,
+    bMessageSendStatusWillSend = 10,
+    bMessageSendStatusSending = 20,
+    bMessageSendStatusSent = 30,
+    bMessageSendStatusFailed = 40,
+} bMessageSendStatus;
+
 
 #define bMessageText @"text"
 
@@ -52,8 +63,10 @@ typedef enum {
 #define bMessageImageData @"image-data"
 #define bMessageImageHeight @"image-height"
 #define bMessageVideoURL @"video-url"
+#define bMessageSize @"size"
 #define bMessageFileURL @"file-url"
 #define bMessageMimeType @"mime-type"
+#define bMessageImagePreview @"image-preview"
 
 #define bMessageLongitude @"longitude"
 #define bMessageLatitude @"latitude"
@@ -153,6 +166,9 @@ typedef enum {
 
 @optional
 
+-(BOOL) sendFailed;
+-(bMessageSendStatus) messageSendStatus;
+-(void) setMessageSendStatus: (bMessageSendStatus) status;
 
 -(void) setReadStatus:(NSDictionary *)status;
 -(BOOL) setReadStatus: (bMessageReadStatus) status_ forUserID: (NSString *) uid date: (NSDate *) date;

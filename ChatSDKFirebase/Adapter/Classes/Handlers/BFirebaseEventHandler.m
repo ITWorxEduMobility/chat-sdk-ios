@@ -9,6 +9,7 @@
 #import "BFirebaseEventHandler.h"
 
 #import <ChatSDKFirebase/FirebaseAdapter.h>
+#import <ChatSDKFirebase/ChatSDKFirebase-Swift.h>
 
 @implementation BFirebaseEventHandler
 
@@ -54,7 +55,7 @@
         // Returns threads one by one
         if (snapshot.value != [NSNull null]) {
             // Make the new thread
-            CCThreadWrapper * thread = [CCThreadWrapper threadWithEntityID:snapshot.key];
+            CCThreadWrapper * thread = [FirebaseNetworkAdapterModule.shared.firebaseProvider threadWrapperWithEntityID:snapshot.key];
             if (![thread.model.users containsObject:user]) {
                 [thread.model addUser:user];
             }
@@ -64,8 +65,6 @@
                 return success;
             }, nil);
 
-            [thread messagesOn];
-            [thread usersOn];
         }
     }];
     
@@ -73,7 +72,8 @@
         // Returns threads one by one
         if (snapshot.value != [NSNull null]) {
             // Make the new thread
-            CCThreadWrapper * thread = [CCThreadWrapper threadWithEntityID:snapshot.key];
+            CCThreadWrapper * thread = [FirebaseNetworkAdapterModule.shared.firebaseProvider threadWrapperWithEntityID:snapshot.key];
+
             [thread off];
             [thread messagesOff]; // We need to turn the messages off incase we rejoin the thread
             
@@ -96,13 +96,13 @@
     [query observeEventType:FIRDataEventTypeChildAdded withBlock:^(FIRDataSnapshot * snapshot) {
         if (snapshot.value != [NSNull null]) {
             // Make the new thread
-            CCThreadWrapper * thread = [CCThreadWrapper threadWithEntityID:snapshot.key];
+            CCThreadWrapper * thread = [FirebaseNetworkAdapterModule.shared.firebaseProvider threadWrapperWithEntityID:snapshot.key];
             
             // Make sure that we're not in the thread
             // there's an edge case where the user could kill the app and remain
             // a member of a public thread
             if (!BChatSDK.config.publicChatAutoSubscriptionEnabled) {
-                [thread removeUser:[CCUserWrapper userWithModel:user]];
+                [thread removeUser:[FirebaseNetworkAdapterModule.shared.firebaseProvider userWrapperWithModel:user]];
             }
             
             [thread on].thenOnMain(^id(id success) {
@@ -111,8 +111,8 @@
             }, nil);
 
             // TODO: Maybe move this so we only listen to a thread when it's open
-            [thread messagesOn];
-            [thread usersOn];
+//            [thread messagesOn];
+//            [thread usersOn];
         }
     }];
 }
@@ -174,7 +174,7 @@
     
     if (user) {
         for (id<PThread> threadModel in user.threads) {
-            CCThreadWrapper * thread = [CCThreadWrapper threadWithModel:threadModel];
+            CCThreadWrapper * thread = [FirebaseNetworkAdapterModule.shared.firebaseProvider threadWrapperWithModel: threadModel];
             [thread off];
         }
     }
@@ -183,7 +183,7 @@
 -(void) publicThreadsOff: (id<PUser>) user {
     FIRDatabaseReference * publicThreadsRef = [FIRDatabaseReference publicThreadsRef];
     for (id<PThread> threadModel in [BChatSDK.thread threadsWithType:bThreadTypePublicGroup]) {
-        CCThreadWrapper * thread = [CCThreadWrapper threadWithModel:threadModel];
+        CCThreadWrapper * thread = [FirebaseNetworkAdapterModule.shared.firebaseProvider threadWrapperWithModel: threadModel];
         [thread off];
     }
     [publicThreadsRef removeAllObservers];
@@ -193,8 +193,10 @@
     for (id<PUserConnection> contact in [user connectionsWithType:bUserConnectionTypeContact]) {
         // Turn the contact on
         id<PUser> contactModel = contact.user;
-        [[CCUserWrapper userWithModel:contactModel] off];
-        [[CCUserWrapper userWithModel:contactModel] onlineOff];
+        CCUserWrapper * wrapper = [FirebaseNetworkAdapterModule.shared.firebaseProvider userWrapperWithModel:contactModel];
+        
+        [wrapper off];
+        [wrapper onlineOff];
     }
 }
 

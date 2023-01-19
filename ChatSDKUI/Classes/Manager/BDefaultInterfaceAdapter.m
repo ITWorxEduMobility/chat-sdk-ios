@@ -41,6 +41,13 @@
         // Setup default providers
         [self setProvider:[BMessageSectionDateProvider new] forName:bMessageSectionDateProvider];
         
+        if (@available(iOS 15.0, *)) {
+            UINavigationBarAppearance * appearance = [UINavigationBarAppearance new];
+            [appearance configureWithDefaultBackground];
+            [UINavigationBar.appearance setStandardAppearance:appearance];
+            [UINavigationBar.appearance setScrollEdgeAppearance:appearance];
+            [UINavigationBar.appearance setCompactAppearance:appearance];
+        }
 
     }
     return self;
@@ -85,6 +92,15 @@
         _publicThreadsViewController = [[BPublicThreadsViewController alloc] init];
     }
     return _publicThreadsViewController;
+}
+
+-(UIViewController *) editThreadsViewController: (id<PThread>) thread didSave: (void(^)()) callback {
+    if (!_editThreadViewController) {
+        EditThreadViewController * vc = [[EditThreadViewController alloc] initWithNibName:nil bundle:nil thread:thread];
+        [vc setDidSaveCallbackWithCallback:callback];
+        _editThreadViewController = vc;
+    }
+    return _editThreadViewController;
 }
 
 -(UIViewController *) flaggedMessagesViewController {
@@ -132,14 +148,14 @@
     return _contactsViewController;
 }
 
--(BFriendsListViewController *) friendsViewControllerWithUsersToExclude: (NSArray<PUser> *) usersToExclude onComplete: (void(^)(NSArray<PUser> * users, NSString * groupName)) action{
+-(BFriendsListViewController *) friendsViewControllerWithUsersToExclude: (NSArray<PUser> *) usersToExclude onComplete: (void(^)(NSArray<PUser> * users, NSString * groupName, UIImage * image)) action{
     if (_friendsListViewController != Nil) {
         return _friendsListViewController(usersToExclude, action);
     }
     return [[BFriendsListViewController alloc] initWithUsersToExclude:usersToExclude onComplete:action];
 }
 
--(UINavigationController *) friendsNavigationControllerWithUsersToExclude: (NSArray<PUser> *) usersToExclude onComplete: (void(^)(NSArray<PUser> * users, NSString * name)) action {
+-(UINavigationController *) friendsNavigationControllerWithUsersToExclude: (NSArray<PUser> *) usersToExclude onComplete: (void(^)(NSArray<PUser> * users, NSString * name, UIImage * image)) action {
     return [self navigationControllerWithRootViewController:[self friendsViewControllerWithUsersToExclude:usersToExclude onComplete:action]];
 }
 
@@ -248,11 +264,11 @@
         [options addObject:[[BMediaChatOption alloc] initWithType:bPictureTypeCameraVideo]];
     }
     else if (imageEnabled)  {
-        [options addObject:[[BMediaChatOption alloc] initWithType:bPictureTypeCameraImage]];
+        [options addObject:[[BMediaChatOption alloc] initWithType:bPictureTypeCameraImage cropperEnabled:YES]];
     }
     
     if (imageEnabled) {
-        [options addObject:[[BMediaChatOption alloc] initWithType:bPictureTypeAlbumImage]];
+        [options addObject:[[BMediaChatOption alloc] initWithType:bPictureTypeAlbumImage cropperEnabled:YES]];
     }
     if (videoEnabled) {
         [options addObject:[[BMediaChatOption alloc] initWithType:bPictureTypeAlbumVideo]];

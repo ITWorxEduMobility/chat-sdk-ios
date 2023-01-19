@@ -108,6 +108,8 @@ typedef enum {
 -(BOOL) hasMessages;
 
 -(NSString *) imageURL;
+-(void) setImageURL: (NSString *) url;
+
 
 -(NSDate *) orderDate;
 
@@ -128,6 +130,9 @@ typedef enum {
 -(id<PUserConnection>) connection: (NSString *) entityID;
 
 -(void) markDeleted: (BOOL) notify;
+
+-(void) setCanDeleteMessagesFromDate: (NSDate *) date;
+-(NSDate *) canDeleteMessagesFromDate;
 
 @end
 

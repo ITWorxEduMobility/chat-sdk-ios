@@ -8,11 +8,12 @@
 
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
-#import "XMPP.h"
+//#import "XMPP.h"
+#import <ChatSDKVendor/XMPPFramework.h>
 #import <ChatSDK/PUser.h>
 
-#import "XMPPvCardAvatarModule.h"
-#import "XMPPBlocking.h"
+//#import "XMPPvCardAvatarModule.h"
+//#import "XMPPBlocking.h"
 
 @class BXMPPRoster;
 @class XMPPRosterMemoryStorage;
@@ -32,6 +33,9 @@
 }
 
 @property (nonatomic, readonly) BOOL blockingServiceAvailable;
+
+@property (nonatomic, readwrite) BXMPPRoster * xmppRoster;
+@property (nonatomic, readwrite) XMPPRosterMemoryStorage * xmppRosterStorage;
 
 -(RXPromise *) myvCardTemp;
 //-(RXPromise *) vcardForUserWithJID: (NSString *) jid;

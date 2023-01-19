@@ -7,6 +7,7 @@
 
 #import "BMessageBuilder.h"
 #import <ChatSDK/Core.h>
+#import <ChatSDK/ChatSDK-Swift.h>
 
 @implementation BMessageBuilder
 
@@ -48,7 +49,7 @@
 }
 
 -(BMessageBuilder *) withType: (bMessageType) type {
-    [self type:bMessageTypeText];
+    [self type:type];
     return self;
 }
 
@@ -91,7 +92,11 @@
 
 -(BMessageBuilder *) imageMessage: (UIImage *) image{
     [self type:bMessageTypeImage];
-    _message.placeholder = UIImagePNGRepresentation(image);
+    
+    // Rotate image to be correct orientation
+//    image = [UIImage fixedOrientationFor:image];
+    
+    _message.placeholder = UIImageJPEGRepresentation(image, 0.6);
     return self;
 }
 

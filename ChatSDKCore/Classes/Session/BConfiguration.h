@@ -66,6 +66,9 @@ typedef enum {
 // User profile image
 @property (nonatomic, readwrite) UIImage * xmppDefaultAvatar;
 
+// Should the app always show a back button on modal views or rely on the swipe to dismiss
+@property (nonatomic, readwrite) BOOL alwaysShowBackButtonOnModalViews;
+
 @property (nonatomic, readwrite) NSString * timeFormat;
 
 // The maximum dimension for an image message
@@ -135,6 +138,8 @@ typedef enum {
 // 120x120px
 @property (nonatomic, readwrite) UIImage * logoImage;
 
+@property (nonatomic, readwrite) NSString * timeAgoDateFormat;
+
 // The app name text displayed on the login screen
 @property (nonatomic, readwrite) NSString * loginScreenAppName;
 
@@ -201,6 +206,9 @@ typedef enum {
 
 @property (nonatomic, readwrite) BOOL prefersLargeTitles;
 
+// Use the old cropper view - only really needed with legacy BChatViewController
+@property (nonatomic, readwrite) BOOL legacyCropperEnabled;
+
 @property (nonatomic, readwrite) NSMutableDictionary * remote;
 @property (nonatomic, readwrite) BOOL remoteConfigEnabled;
 
@@ -250,6 +258,11 @@ typedef enum {
 // If this is true, extra data will be added to support Chat SDK web
 @property (nonatomic, readwrite) BOOL enableWebCompatibility;
 
+@property (nonatomic, readwrite) UIColor * threadUnreadViewBackgroundColor;
+@property (nonatomic, readwrite) UIColor * threadUnreadViewTextColor;
+
+@property (nonatomic, readwrite) UIColor * threadCellTypingTextColor;
+@property (nonatomic, readwrite) UIColor * threadCellLastMessageTextColor;
 
 
 // Firebase options
@@ -307,7 +320,15 @@ typedef enum {
 // If it's set to false, we only add the message to the queue if it fails to send.
 @property (nonatomic, readwrite) BOOL xmppOutgoingMessageAlwaysAdd;
 
+@property (nonatomic, readwrite) BOOL xmppAutoAcceptIncomingPresenceRequests;
 
+
+@property (nonatomic, readwrite) BOOL sendBase64ImagePreview;
+@property (nonatomic, readwrite) CGFloat imagePreviewMaxSize;
+@property (nonatomic, readwrite) CGFloat imagePreviewQuality;
+
+@property (nonatomic, readwrite) BOOL groupImagesEnabled;
+@property (nonatomic, readwrite) BOOL allowEmptyBody;
 
 +(BConfiguration *) configuration;
 

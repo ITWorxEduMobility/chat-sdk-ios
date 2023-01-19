@@ -46,13 +46,17 @@ open class CKMessageStore {
     }
 
     open func message(for message: PMessage) -> CKMessage {
-        let message = self.message(with: message.entityID()) ?? new(for: message)
+         let message = self.message(with: message.entityID()) ?? new(for: message)
         messageStore[message.messageId()] = message
         return message
     }
 
     open func message(with id: String) -> CKMessage? {
         return messageStore[id]
+    }
+    
+    open func remove(with id: String) {
+        messageStore.removeValue(forKey: id)
     }
 
 

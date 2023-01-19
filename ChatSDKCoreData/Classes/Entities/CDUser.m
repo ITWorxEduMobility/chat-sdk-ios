@@ -24,6 +24,9 @@
     if (!name || !name.length) {
         name = [self.meta metaStringForKey:bUserNameKey];
     }
+    if (!name || !name.length) {
+        name = [self.meta metaStringForKey:bUserPhoneKey];
+    }
     return name;
 }
 
@@ -182,6 +185,7 @@
 
 -(void) setImageURL: (NSString *) url {
     [self updateMeta:@{bUserImageURLKey: url}];
+    [self updateMeta:@{bImageURL: url}];
 }
 
 -(BOOL) isMe {

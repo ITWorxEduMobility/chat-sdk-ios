@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = "ChatK!t"
-  s.version          = "5.1.3"
+  s.version          = "5.1.5"
   s.summary          = "ChatK!t - Message View"
   s.homepage         = "https://chatk.it"
   s.license          = { :type => 'Apache 2.0' }
@@ -21,7 +21,7 @@ Pod::Spec.new do |s|
     s.resources = 'ChatK!t/Core/**/*.{xib,xcassets,strings}'
 
     s.dependency 'ChatSDKKeepLayout'
-    s.dependency 'NextGrowingTextView'
+    s.dependency 'NextGrowingTextView', '1.6.1'
     s.dependency 'CollectionKit'
     s.dependency 'FFCircularProgressView'
     s.dependency 'MZDownloadManager'
@@ -30,6 +30,10 @@ Pod::Spec.new do |s|
     s.dependency 'RxSwift', '~>6.2.0'
     s.dependency 'DateTools'
     s.dependency 'SDWebImage'
+    s.dependency 'ZLImageEditor'
+    # s.dependency 'WPMediaPicker'
+    # s.dependency 'YPImagePicker'
+    s.dependency 'TLPhotoPicker'
 
   end
   
@@ -38,5 +42,6 @@ Pod::Spec.new do |s|
     s.dependency 'ChatSDK/UI'
     s.dependency 'ChatK!t/ChatK!t'
   end
-      
+
+
 end

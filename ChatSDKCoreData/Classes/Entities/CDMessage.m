@@ -108,7 +108,14 @@
 }
 
 -(NSString *) text {
-    return self.meta[bMessageText];
+    NSObject * text = self.meta[bMessageText];
+    if ([text isKindOfClass:NSString.class]) {
+        return text;
+    }
+    if ([text isKindOfClass:NSNumber.class]) {
+        return ((NSNumber *)text).stringValue;
+    }
+    else return @"";
 }
 
 -(void) setText: (NSString *) text {
@@ -144,6 +151,8 @@
         return [userStatus[bStatus] intValue];
     }
     return bMessageReadStatusNone;
+    
+    
 }
 
 -(BOOL) setReadStatus: (bMessageReadStatus) status_ forUserID: (NSString *) uid {
@@ -265,6 +274,26 @@
 
 -(bMessageType) replyType {
     return [self.meta[bType] intValue];
+}
+
+-(BOOL) sendFailed {
+    NSNumber * status = self.meta[bMessageSendStatusKey];
+    if (status != nil && status.intValue == bMessageSendStatusFailed) {
+        return YES;
+    }
+    return NO;
+}
+
+-(void) setMessageSendStatus: (bMessageSendStatus) status {
+    [self setMetaValue:@(status) forKey:bMessageSendStatusKey];
+}
+
+-(bMessageSendStatus) messageSendStatus {
+    NSNumber * status = self.meta[bMessageSendStatusKey];
+    if (status != nil) {
+        return status.intValue;
+    }
+    return bMessageSendStatusNone;
 }
 
 -(void) setupInitialReadReceipts {

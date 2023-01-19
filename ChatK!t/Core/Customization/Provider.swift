@@ -58,6 +58,14 @@ open class Provider {
         return MessagesView()
     }
 
+    open func keyboardOverlayView() -> KeyboardOverlayView {
+        return KeyboardOverlayView()
+    }
+
+    open func keyboardOverlayTextView(overlay: KeyboardOverlayView) -> KeyboardOverlayTextView {
+        return KeyboardOverlayTextView(overlayView: overlay)
+    }
+
     open func chatHeaderView() -> ChatHeaderView {
         return ChatHeaderView()
     }
@@ -115,6 +123,22 @@ open class Provider {
     
     open func messageHeightCache() -> MessageHeightCache {
         return MessageHeightCache()
+    }
+    
+    open func didBind(_ cell: AbstractMessageCell, message: AbstractMessage, model: MessagesModel) {
+
+    }
+    
+    open func recordKeyboardOverlay(_ delegate: RecordViewDelegate) -> RecordKeyboardOverlay {
+        return RecordKeyboardOverlay.new(delegate)
+    }
+
+    open func optionsKeyboardOverlay() -> OptionsKeyboardOverlay {
+        return OptionsKeyboardOverlay()
+    }
+
+    open func keyboardOverlay(for key: String) -> KeyboardOverlay? {
+        return nil
     }
 
 }

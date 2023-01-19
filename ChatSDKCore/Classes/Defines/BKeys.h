@@ -38,6 +38,7 @@
 #define bReadPath @"read"
 #define bImageURL @"image-url"
 #define bNickname @"nick"
+#define bPermissionsPath @"permissions"
 
 #define bCreationDate @"creation-date"
 #define bMessage @"message"
@@ -89,10 +90,16 @@
 
 #define bReplyKey @"reply"
 
+#define bHiddenKey @"hidden-"
+#define bMessageSendStatusKey @"hidden-send-status"
+
 #define bUserPrivilegeKey @"privilege"
 #define bUserNameLowercase @"name-lowercase"
 #define bUID @"uid"
 
-#define bLocalNotification = @"local-notification"
+#define bLocalNotification @"local-notification"
+
+#define bCanDeleteMessagesFrom @"bCanDeleteMessagesFrom"
+#define bCallHistory @"bCallHistory"
 
 #endif /* BKeys_h */

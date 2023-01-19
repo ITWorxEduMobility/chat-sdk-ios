@@ -17,6 +17,9 @@ public class Strings {
     public static let connecting = "connecting"
     public static let copiedToClipboard = "copiedToClipboard"
     public static let grantCameraPermission = "grantCameraPermission"
+    public static let processing = "Processing"
+    public static let processed_of_ = "processed_of_"
+    public static let exported_of_ = "exported_of_"
 
     public static let lastSeen_at_ = "lastSeen_at_"
     public static let today = "today"
@@ -30,6 +33,11 @@ public class Strings {
     public static let file = "file"
     public static let sticker = "sticker"
     public static let video = "video"
+    public static let messageSendFailed = "messageSendFailed"
+
+    public static let resendMessage = "resendMessage"
+    public static let resend = "resend"
+    public static let dismiss = "dismiss"
 
     public static func t(_ text: String) -> String {
         return NSLocalizedString(text, bundle: Bundle(for: Strings.self), comment: "")

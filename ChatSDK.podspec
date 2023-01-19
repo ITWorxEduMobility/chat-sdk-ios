@@ -1,8 +1,8 @@
 Pod::Spec.new do |s|
   s.name             = "ChatSDK"
-  s.version          = "5.1.3"
+  s.version          = "5.1.5"
   s.summary          = "Chat SDK - Mobile messaging framework for iOS"
-  s.homepage         = "https://sdk.chat"
+  s.homepage         = "https://chatsdk.co"
   s.license          = { :type => 'Chat SDK License' }
   s.author           = { "Ben Smiley" => "ben@chatsdk.co" }
   s.source           = { :git => "https://github.com/chat-sdk/chat-sdk-ios.git", :tag => s.version.to_s }
@@ -74,13 +74,14 @@ Pod::Spec.new do |s|
 	  s.dependency 'VENTokenField', '~> 2.0'
 	  s.dependency 'SDWebImage', '~> 5.0'
 	  s.dependency 'StaticDataTableViewController', '~> 2.0'
-	  s.dependency 'TOCropViewController', '~> 2.0'
+	  s.dependency 'CropViewController', '~> 2.0'
 	  s.dependency 'Hakawai', '~> 5.1.5'
 	  s.dependency 'ChatSDKKeepLayout'
 	  s.dependency 'Toast', '~>4.0.0'
 	  s.dependency 'EFQRCode', '~> 5.1.6'
 	  s.dependency 'CollectionKit'
     s.dependency 'QuickTableViewController'	  
+    s.dependency 'ZLImageEditor'
 
 	  s.dependency 'ChatSDK/CoreData'
 	  s.frameworks = 'CoreLocation'
@@ -99,7 +100,6 @@ Pod::Spec.new do |s|
 	  s.source_files = ['ChatSDKExtras/Base64ImageMessage/**/*.{swift,h,m}']
       s.dependency 'ChatSDK/UI'
   end
-
   
   # s.subspec 'Extras' do |s|
 

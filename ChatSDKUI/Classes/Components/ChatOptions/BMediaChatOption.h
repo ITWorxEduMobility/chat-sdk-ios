@@ -9,7 +9,7 @@
 #import <ChatSDK/BChatOption.h>
 #import <ChatSDK/bPictureTypes.h>
 
-#import <TOCropViewController/TOCropViewController.h>
+#import <CropViewController/TOCropViewController.h>
 
 @class RXPromise;
 @protocol TOCropViewControllerDelegate;
@@ -18,8 +18,10 @@
     UIImagePickerController * _picker;
     RXPromise * _promise;
     bPictureType _type;
+    BOOL _cropperEnabled;
 }
 
 -(instancetype) initWithType: (bPictureType) type;
+-(instancetype) initWithType: (bPictureType) type cropperEnabled: (BOOL) cropperEnabled;
 
 @end
