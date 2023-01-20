@@ -19,7 +19,7 @@ static BAudioManager * manager;
 @synthesize recorder = _recorder;
 @synthesize player = _player;
 
-+(BAudioManager *) sharedManager {
++(BAudioManager *) shared {
     
     @synchronized(self) {
         
@@ -110,16 +110,18 @@ static BAudioManager * manager;
 }
 
 - (void)playAudioWithURL:(NSURL *) url {
-    [self initializePlayer: url].thenOnMain(^id(id success) {
-        if ([[self itemForURL:url].item isEqual:_player.currentItem]) {
-            [self seekAndPlayCurrentAudio];
-        } else {
-            [self pauseAudio];
-            [self loadAudioFromURL:url];
-            [self seekAndPlayCurrentAudio];
-        }
-        return Nil;
-    }, Nil);
+    if (url) {
+        [self initializePlayer: url].thenOnMain(^id(id success) {
+            if ([[self itemForURL:url].item isEqual:_player.currentItem]) {
+                [self seekAndPlayCurrentAudio];
+            } else {
+                [self pauseAudio];
+                [self loadAudioFromURL:url];
+                [self seekAndPlayCurrentAudio];
+            }
+            return Nil;
+        }, Nil);
+    }
 }
 
 -(void) seekAndPlayCurrentAudio {

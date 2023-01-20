@@ -6,29 +6,104 @@
 //
 
 import Foundation
+import KeepLayout
+import SDWebImage
+import ChatSDK
 
-@objc public class TextMessageContent: DefaultMessageContent {
+open class TextMessageContent: DefaultMessageContent {
     
-    lazy var label: UILabel = {
+    open lazy var label: UILabel = {
         let label = UILabel()
         label.numberOfLines = 0
+//        label.lineBreakMode = .byWordWrapping
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
     }()
+        
+    open lazy var replyView: MessageReplyView = {
+        return ChatKit.provider().messageReplyView()
+    }()
     
-    lazy var containerView: UIView = {
+    open lazy var containerView: UIView = {
         let view = UIView()
+        view.clipsToBounds = true
         view.addSubview(label)
-        label.keepInsets.equal = 8
+        view.translatesAutoresizingMaskIntoConstraints = false
+        
+        label.keepLeftInset.equal = ChatKit.config().bubbleInsets.left
+        label.keepBottomInset.equal = ChatKit.config().bubbleInsets.bottom
+        label.keepRightInset.equal = ChatKit.config().bubbleInsets.right
+        label.keepTopInset.equal = KeepHigh(ChatKit.config().bubbleInsets.top)
+                
         return view
     }()
     
-    @objc override public func view() -> UIView {
+    override open func view() -> UIView {
         return containerView
     }
     
-    @objc override public func bind(message: Message) {
-        label.text = message.messageText()
+    override open func bind(_ message: AbstractMessage, model: MessagesModel) {
+        super.bind(message, model: model)
+
+        if message.messageDirection() == .incoming {
+            replyView.layer.maskedCorners = [.layerMaxXMaxYCorner, .layerMinXMaxYCorner, .layerMaxXMinYCorner]
+            label.textColor = ChatKit.asset(color: ChatKit.config().incomingMessageTextColor)
+        }
+        if message.messageDirection() == .outgoing {
+            replyView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMinYCorner]
+            label.textColor = ChatKit.asset(color: ChatKit.config().outgoingMessageTextColor)
+        }
+        if let reply = message.messageReply() {
+            showReply(title: reply.replyTitle(), text: reply.replyText(), imageURL: reply.replyImageURL(), placeholder: reply.replyPlaceholder())
+        } else {
+            hideReply()
+        }
+        
+        // We do this to make space for the time label
+        if let text = message.messageText() {
+            if message.messageDirection() == .outgoing && message.messageReadStatus() != .none {
+                label.text = text + "             "
+            } else {
+                label.text = text + "        "
+            }
+        } else {
+            label.text = nil
+        }
+
+    }
+    
+    open func hideReply() {
+        if replyView.superview != nil {
+            label.keepTopOffsetTo(replyView)?.deactivate()
+            replyView.removeFromSuperview()
+            label.keepTopInset.equal = ChatKit.config().bubbleInsets.top
+        }
+    }
+    
+    open func showReply(title: String?, text: String?, imageURL: URL? = nil, placeholder: UIImage? = nil) {
+        if replyView.superview == nil {
+            containerView.addSubview(replyView)
+
+            replyView.keepLeftInset.equal = ChatKit.config().bubbleInsets.left
+            replyView.keepTopInset.equal = ChatKit.config().bubbleInsets.top
+            replyView.keepRightInset.equal = ChatKit.config().bubbleInsets.right
+            replyView.keepHeight.equal = KeepFitting(ChatKit.config().messageReplyViewHeight)
+
+            label.keepTopInset.deactivate()
+            label.keepTopOffsetTo(replyView)?.equal = ChatKit.config().bubbleInsets.top
+        }
+  
+        replyView.titleLabel.text = title
+        replyView.textLabel.text = text
+        if let url = imageURL {
+            replyView.showImage()
+            replyView.imageView.sd_setImage(with: url, placeholderImage: placeholder, options: .scaleDownLargeImages, completed: nil)
+        } else if let placeholder = placeholder {
+            replyView.showImage()
+            replyView.imageView.image = placeholder
+        } else {
+            replyView.hideImage()
+        }
     }
         
 }

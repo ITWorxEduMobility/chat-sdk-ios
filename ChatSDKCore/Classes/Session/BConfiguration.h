@@ -48,16 +48,34 @@ typedef enum {
 @property (nonatomic, readwrite) NSString * debugUsername;
 @property (nonatomic, readwrite) NSString * debugPassword;
 
+// When debug mode is enabled, there will be more logging
+@property (nonatomic, readwrite) BOOL debugModeEnabled;
+
 // Should empty chats be shown in the threads view?
 @property (nonatomic, readwrite) BOOL showEmptyChats;
 
 // User profile image
 @property (nonatomic, readwrite) NSString * defaultAvatarURL;
 
+// Provide a URL to generate an avatar
+// This URL should provide a link to a PNG to be used
+// it should be the form http://someurl.com/%s.png
+// %s will be replaced by the user's entity ID
+@property (nonatomic, readwrite) NSString * identiconBaseURL;
+
+// User profile image
+@property (nonatomic, readwrite) UIImage * xmppDefaultAvatar;
+
+// Should the app always show a back button on modal views or rely on the swipe to dismiss
+@property (nonatomic, readwrite) BOOL alwaysShowBackButtonOnModalViews;
+
 @property (nonatomic, readwrite) NSString * timeFormat;
 
 // The maximum dimension for an image message
 @property (nonatomic, readwrite) int maxImageDimension;
+
+// The maximum dimension for a reply thumbnail
+@property (nonatomic, readwrite) int replyThumbnailSize;
 
 // Can users make new public chats. It's recommended to set this to no otherwise
 // users will create a large number of chats
@@ -76,6 +94,9 @@ typedef enum {
 // won't add the read receipt listener
 @property (nonatomic, readwrite) float readReceiptMaxAgeInSeconds;
 
+// Are group chats encrypted? Only relevant if encryption module is enabled
+@property (nonatomic, readwrite) BOOL encryptGroupThreads;
+
 // Enable or disable social login options
 @property (nonatomic, readwrite) BOOL anonymousLoginEnabled;
 @property (nonatomic, readwrite) BOOL forgotPasswordEnabled;
@@ -88,10 +109,24 @@ typedef enum {
 @property (nonatomic, readwrite) int xmppMucMessageHistory;
 @property (nonatomic, readwrite) NSString * termsOfServiceURL;
 @property (nonatomic, readwrite) BOOL xmppCustomCertEvaluation;
+@property (nonatomic, readwrite) NSString * xmppPubsubNode;
+@property (nonatomic, readwrite) BOOL xmppInvisibleModeEnabled;
+
+@property (nonatomic, readwrite) NSString * xmppUpdateLastOnlineOnResignActive;
+@property (nonatomic, readwrite) BOOL xmppReciprocalPresenceRequests;
+
+@property (nonatomic, readwrite) BOOL threadDestructionEnabled;
+@property (nonatomic, readwrite) BOOL callsEnabled;
+
+@property (nonatomic, readwrite) NSTimeInterval xmppPingInterval;
+@property (nonatomic, readwrite) NSTimeInterval xmppPingTimeout;
 
 @property (nonatomic, readwrite) BOOL xmppAdvancedConfigurationEnabled;
 
 @property (nonatomic, readwrite) BOOL messageDeletionEnabled;
+
+@property (nonatomic, readwrite) BOOL allowUserToRejoinGroup;
+@property (nonatomic, readwrite) BOOL deleteThreadOnLeaving;
 
 // The message view text input box, max lines and characters
 @property (nonatomic, readwrite) int textInputViewMaxLines;
@@ -102,6 +137,8 @@ typedef enum {
 // The the image to be displayed on the login screen. Image should be
 // 120x120px
 @property (nonatomic, readwrite) UIImage * logoImage;
+
+@property (nonatomic, readwrite) NSString * timeAgoDateFormat;
 
 // The app name text displayed on the login screen
 @property (nonatomic, readwrite) NSString * loginScreenAppName;
@@ -126,6 +163,12 @@ typedef enum {
 @property(nonatomic, readwrite) NSString * messageBubbleMaskMiddle;
 @property(nonatomic, readwrite) NSString * messageBubbleMaskLast;
 @property(nonatomic, readwrite) NSString * messageBubbleMaskSingle;
+
+@property(nonatomic, readwrite) BOOL disableSendButtonWhenDisconnected;
+@property(nonatomic, readwrite) BOOL disableSendButtonWhenNotReachable;
+
+@property (nonatomic, readwrite) BOOL xmppOutgoingMessageQueueEnabled;
+@property (nonatomic, readwrite) BOOL xmppSendPushOnAck;
 
 @property(nonatomic, readwrite) bNameLabelPosition nameLabelPosition;
 @property(nonatomic, readwrite) BOOL combineTimeWithNameLabel;
@@ -157,9 +200,14 @@ typedef enum {
 @property (nonatomic, readwrite) BOOL locationMessagesEnabled;
 @property (nonatomic, readwrite) BOOL imageMessagesEnabled;
 
+@property (nonatomic, readwrite) BOOL autoSaveOnTerminate;
+
 @property (nonatomic, readwrite) int audioMessageMaxLengthSeconds;
 
 @property (nonatomic, readwrite) BOOL prefersLargeTitles;
+
+// Use the old cropper view - only really needed with legacy BChatViewController
+@property (nonatomic, readwrite) BOOL legacyCropperEnabled;
 
 @property (nonatomic, readwrite) NSMutableDictionary * remote;
 @property (nonatomic, readwrite) BOOL remoteConfigEnabled;
@@ -181,6 +229,7 @@ typedef enum {
 
 // If this is true, then we will only send a push notification if the recipient is offline
 @property (nonatomic, readwrite) BOOL onlySendPushToOfflineUsers;
+
 
 @property (nonatomic, readwrite) NSString * googleMapsApiKey;
 
@@ -209,20 +258,20 @@ typedef enum {
 // If this is true, extra data will be added to support Chat SDK web
 @property (nonatomic, readwrite) BOOL enableWebCompatibility;
 
-// If this is true, extra data will be added to support Chat SDK v4
-@property (nonatomic, readwrite) BOOL enableCompatibilityWithV4;
+@property (nonatomic, readwrite) UIColor * threadUnreadViewBackgroundColor;
+@property (nonatomic, readwrite) UIColor * threadUnreadViewTextColor;
+
+@property (nonatomic, readwrite) UIColor * threadCellTypingTextColor;
+@property (nonatomic, readwrite) UIColor * threadCellLastMessageTextColor;
 
 
 // Firebase options
 
-// Should the Chat SDK call [FIRApp configure];
-@property (nonatomic, readwrite) BOOL firebaseShouldConfigureAutomatically;
-
 // The name of the custom Firebase Google-Services plist file
-@property (nonatomic, readwrite) NSString * firebaseGoogleServicesPlistName;
+//@property (nonatomic, readwrite) NSString * firebaseGoogleServicesPlistName;
 
 @property (nonatomic, readwrite) NSString * firebaseDatabaseURL;
-@property (nonatomic, readwrite) NSString * firebaseApp;
+//@property (nonatomic, readwrite) NSString * firebaseApp;
 @property (nonatomic, readwrite) NSString * firebaseFunctionsRegion;
 @property (nonatomic, readwrite) NSString * firebaseStorageURL;
 
@@ -242,6 +291,8 @@ typedef enum {
 // Show local notifications when a message is received
 @property (nonatomic, readwrite) BOOL showLocalNotifications;
 @property (nonatomic, readwrite) BOOL showLocalNotificationsForPublicChats;
+@property (nonatomic, readwrite) BOOL showLocalNotificationInChat;
+@property (nonatomic, readwrite) BOOL showLocalNotificationForEncryptedChats;
 
 // Profile Pictures
 @property (nonatomic, readwrite) BOOL profilePicturesEnabled;
@@ -258,11 +309,26 @@ typedef enum {
 // XMPP Auth type used which can be:
 // default, scramsha1, digestmd5, plain
 @property (nonatomic, readwrite) NSString * xmppAuthType;
+@property (nonatomic, readwrite) BOOL xmppUseHTTP;
 
 // How long should a public chat room live until expires and is removed from the list
 @property (nonatomic, readwrite) int publicChatRoomLifetimeMinutes;
 
-@property (nonatomic, readwrite) BOOL vibrateOnNewMessage;
+@property (nonatomic, readwrite) double xmppOutgoingMessageQueueRetryTime;
+
+// Should we add every message to the outgoing message queue and only remove it when it's acknoledged? This is the case if this is set to true
+// If it's set to false, we only add the message to the queue if it fails to send.
+@property (nonatomic, readwrite) BOOL xmppOutgoingMessageAlwaysAdd;
+
+@property (nonatomic, readwrite) BOOL xmppAutoAcceptIncomingPresenceRequests;
+
+
+@property (nonatomic, readwrite) BOOL sendBase64ImagePreview;
+@property (nonatomic, readwrite) CGFloat imagePreviewMaxSize;
+@property (nonatomic, readwrite) CGFloat imagePreviewQuality;
+
+@property (nonatomic, readwrite) BOOL groupImagesEnabled;
+@property (nonatomic, readwrite) BOOL allowEmptyBody;
 
 +(BConfiguration *) configuration;
 

@@ -8,12 +8,14 @@
 import Foundation
 import ChatSDK
 
-@objc public class CKThread: NSObject, Thread {
+
+open class CKThread: Conversation {
     
-    let _thread: PThread
+    let thread: PThread
+    let users: [PUser] = []
     
-    lazy var _threadType: ThreadType = {
-        if let type = _thread.type() {
+    lazy var type: ConversationType = {
+        if let type = thread.type() {
             if type.int32Value == bThreadTypePublicGroup.rawValue {
                 return .publicGroup
             } else if type.int32Value == bThreadTypePrivateGroup.rawValue {
@@ -25,43 +27,38 @@ import ChatSDK
         return .none
     }()
     
-    @objc public init(thread: PThread) {
-        _thread = thread
+    public init(_ thread: PThread) {
+        self.thread = thread
     }
 
-    @objc public func threadId() -> String {
-        return _thread.entityID()
+    open func conversationId() -> String {
+        return thread.entityID()
     }
     
-    @objc public func threadName() -> String {
-        return _thread.name()
+    open func conversationName() -> String {
+        return thread.displayName() ?? "Thread"
     }
     
-    @objc public func threadImageUrl() -> URL? {
+    open func conversationImageUrl() -> URL? {
+        if let url = UIImageView.threadImageURL(thread) {
+            return URL(string: url)
+        }
         return nil
     }
     
-    @objc public func threadUsers() -> [User] {
+    open func conversationUsers() -> [User] {
         var users = [User]()
-        for user in _thread.users() {
+        
+        for user in thread.users() {
             if let user = user as? PUser {
                 users.append(CKUser(user: user))
             }
         }
+        
         return users
     }
-    
-    @objc public func threadMessages() -> [Message] {
-        var messages = [Message]()
-        for message in _thread.messagesOrderedByDateOldestFirst() {
-            if let message = message as? PMessage {
-                messages.append(CKMessage(message: message))
-            }
-        }
-        return messages
-    }
-    
-    @objc public func threadType() -> ThreadType {
-        return _threadType
+        
+    open func conversationType() -> ConversationType {
+        return type
     }
 }

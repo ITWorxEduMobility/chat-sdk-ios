@@ -20,8 +20,11 @@
 #define bChatRooms @"bChatRooms"
 #define bThreadCreationError @"bThreadCreationError"
 #define bSearchTerm @"bSearchTerm"
+#define bWaitingForNetwork @"bWaitingForNetwork"
+#define bConnecting @"bConnecting"
 
-#define bPickFriends @"bPickFriends"
+#define bSelectUsers @"bSelectUsers"
+#define bForwardMessage @"bForwardMessage"
 
 #define bBack @"bBack"
 #define bImageSaved @"bImageSaved"
@@ -47,11 +50,14 @@
 #define bSearch @"bSearch"
 #define bSearching @"bSearching"
 #define bNoNearbyUsers @"bNoNearbyUsers"
+#define bNearbyUsersModuleDisabled @"bNearbyUsersModuleDisabled"
 
 #define bAddUsers @"bAddUsers"
+#define bEdit @"bEdit"
 
 #define bOnline @"online"
 #define bOffline @"offline"
+#define bActive @"bActive"
 
 #define bCreatePublicThread @"bCreatePublicThread"
 #define bThreadName @"bThreadName"
@@ -68,6 +74,11 @@
 #define bChat @"bChat"
 #define bOptions @"bOptions"
 #define bTakePhoto @"bTakePhoto"
+
+#define bPhotoLibrary @"bPhotoLibrary"
+#define bPhotoAlbum @"bPhotoAlbum"
+#define bImageUnavailable @"bImageUnavailable"
+
 #define bTakeVideo @"bTakeVideo"
 #define bTakePhotoOrVideo @"bTakePhotoOrVideo"
 #define bChooseExistingPhoto @"bChooseExistingPhoto"
@@ -82,12 +93,16 @@
 #define bFlagged @"bFlagged"
 #define bFlag @"bFlag"
 #define bDelete @"bDelete"
+#define bDestroy @"bDestroy"
 #define bUnflag @"bUnflag"
 #define bHoldToSendAudioMessageError @"bHoldToSendAudioMessageError"
 #define bRecording @"bRecording"
 #define bSecondsRemaining_ @"bSecondsRemaining_"
 #define bAudioLengthLimitReached @"bAudioLengthLimitReached"
 #define bSendOrDiscardRecording @"bSendOrDiscardRecording"
+
+#define bDestroyAndDelete @"bDestroyAndDelete"
+
 
 #define bCancelled @"bCancelled"
 #define bSave @"bSave"
@@ -105,11 +120,11 @@
 #define bName @"bName"
 #define bPhoneNumber @"bPhoneNumber"
 #define bEmail @"bEmail"
-#define bDetails @"bDetails"
 #define bAddParticipant @"bAddParticipant"
 #define bLeaveConversation @"bLeaveConversation"
 #define bRejoinConversation @"bRejoinConversation"
 #define bParticipants @"bParticipants"
+#define bMe @"bMe"
 #define bActiveParticipants @"bActiveParticipants"
 #define bNoActiveParticipants @"bNoActiveParticipants"
 #define bTapHereForContactInfo @"bTapHereForContactInfo"
@@ -124,8 +139,8 @@
 #define bEdit @"bEdit"
 #define b_Ago @"b_Ago"
 
-#define bRemoveFriend @"bRemoveFriend"
-#define bAddFriend @"bAddFriend"
+#define bRemoveFromGroup @"bRemoveFromGroup"
+
 #define bAddContact @"bAddContact"
 #define bUnblock @"bUnblock"
 #define bBlock @"bBlock"
@@ -181,6 +196,7 @@
 #define bVideoMessage @"bVideoMessage"
 #define bStickerMessage @"bStickerMessage"
 #define bFileMessage @"bFileMessage"
+#define bEncryptedMessage @"bEncryptedMessage"
 
 #define bAvailable @"bAvailable"
 #define bAway @"bAway"
@@ -195,6 +211,18 @@
 #define bEncryption @"bEncryption"
 #define bCopiedToClipboard @"bCopiedToClipboard"
 
+// Moderation
+
+#define bRole @"bRole"
+#define bViewProfile @"bViewProfile"
+#define bSilence @"bSilence"
+#define bModeration @"bModeration"
+#define bModerator @"moderator"
+
+#define bSearchTerm @"bSearchTerm"
+#define bWaitingForNetwork @"bWaitingForNetwork"
+#define bConnecting @"bConnecting"
+
 @protocol PMessage;
 
 @interface NSBundle(ChatCore)
@@ -202,5 +230,6 @@
 +(NSBundle *) coreBundle;
 +(NSString *) t: (NSString *) string;
 +(NSString *) textForMessage: (id<PMessage>) message;
++(NSString *) t:(NSString *) string bundle: (NSBundle *) bundle localizable: (NSString *) localizable;
 
 @end

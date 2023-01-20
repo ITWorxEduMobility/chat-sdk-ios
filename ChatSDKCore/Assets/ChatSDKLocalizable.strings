@@ -23,7 +23,7 @@
 "bBroadcast" = "Broadcasts";
 "bThreadCreationError" = "Thread creation failed";
 "bChatRooms" = "Chat Rooms";
-"bPickFriends" = "Pick Friends";
+"bSelectUsers" = "Select Users";
 "bReset" = "Reset";
 "bLogin" = "Login";
 "bRegister" = "Register";
@@ -31,6 +31,7 @@
 "bForgotPassword" = "Forgot password";
 "bEnterCredentialToResetPassword" = "Enter email to reset password";
 "bPasswordResetSuccess" = "Your password reset has been successful";
+"bForwardMessage" = "Forward Message";
 
 "bBack" = "Back";
 "bOpenInMaps" = "Open in maps";
@@ -55,11 +56,16 @@
 "bFlag" = "Flag";
 "bDelete" = "Delete";
 "bUnflag" = "Unflag";
+"bDestroy" = "Destroy";
+"bDestroyAndDelete" = "Destroy and delete chat for all users?";
 
+"bEdit" = "Edit";
 "bSearch" = "Search";
 "bSearching" = "Searching";
-"bAddUsers" = "Add users";
+"bAddUsers" = "Add Users";
 "bNoNearbyUsers" = "No nearby users";
+"bNearbyUsersModuleDisabled" = "Nearby Users Module Disabled";
+
 
 "away" = "Away";
 "xa" = "Extended Away";
@@ -81,6 +87,12 @@
 "bChooseExistingPhoto" = "Choose existing photo";
 "bTakePhoto" = "Take photo";
 "bTakeVideo" = "Take video";
+
+"bPhotoLibrary" = "Photo Library";
+"bPhotoAlbum" = "Saved Photo Album";
+
+"bImageUnavailable" = "Image could not be loaded";
+
 "bTakePhotoOrVideo" = "Take photo or video";
 "bChooseExistingPhoto" = "Choose existing photo";
 "bChooseExistingVideo" = "Choose existing video";
@@ -94,11 +106,11 @@
 "bTapHereForContactInfo" = "tap here for contact info";
 "bPhoneNumber" = "Phone Number";
 "bEmail" = "Email";
-"bDetails" = "Details";
 "bAddParticipant" = "Add Participant";
 "bLeaveConversation" = "Leave Conversation";
 "bRejoinConversation" = "Rejoin Conversation";
 "bParticipants" = "Participants";
+"bMe" = "Me";
 "bActiveParticipants" = "Active Participants";
 "bNoActiveParticipants" = "No Active Participants";
 "bDone" = "Done";
@@ -110,7 +122,27 @@
 "bToday" = "Today";
 "bYesterday" = "Yesterday";
 
+"bActive" = "Active";
+
+"moderator" = "Moderator";
+"participant" = "Participant";
+"visitor" = "Visitor";
+
+"admin" = "Admin";
+"owner" = "Owner";
+"member" = "Member";
+"outcast" = "Banned";
+"banned" = "Banned";
+"watcher" = "Watcher";
+
+"bRole" = "Role";
+"bViewProfile" = "View Profile";
+"bSilence" = "Silence";
+"bModeration" = "Moderation";
+
 "bSearchTerm" = "Search Term";
+"bWaitingForNetwork" = "Waiting for Network";
+"bConnecting" = "Connecting";
 
 "bTo" = "To";
 "bEnterNamesHere" = "Enter names here";
@@ -138,8 +170,7 @@
 "bAudioLengthLimitReached" = "Audio Length Limit Reached";
 "bSendOrDiscardRecording" = "Send or discard recording";
 
-"bAddFriend" = "Add Friend";
-"bRemoveFriend" = "Remove Friend";
+"bRemoveFromGroup" = "Remove from Group";
 
 "bBlock" = "Block";
 "bUnblock" = "Unblock";
@@ -176,12 +207,13 @@
 "bInviteByEmail" = "Email";
 "bInviteBySMS" = "SMS";
 
-"bImageMessage" = "Image Message";
-"bLocationMessage" = "Location Message";
-"bAudioMessage" = "Audio Message";
-"bVideoMessage" = "Video Message";
-"bStickerMessage" = "Sticker Message";
-"bFileMessage" = "File Message";
+"bEncryptedMessage" = "🔒 Encrypted Message";
+"bImageMessage" = "📷 Image Message";
+"bLocationMessage" = "📍Location Message";
+"bAudioMessage" = "🎤 Audio Message";
+"bVideoMessage" = "📹 Video Message";
+"bStickerMessage" = "😊 Sticker Message";
+"bFileMessage" = "📁 File Message";
 "bPhoto" = "Photo";
 "bFile" = "File";
 
@@ -203,3 +235,5 @@
 "bExportKeys" = "Export Keys";
 "bEncryption" = "Encryption";
 "bCopiedToClipboard" = "Copied to clipboard!";
+
+"bCallHistory" = "Call History";

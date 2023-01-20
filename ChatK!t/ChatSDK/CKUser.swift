@@ -8,24 +8,50 @@
 import Foundation
 import ChatSDK
 
-@objc public class CKUser: NSObject, User {
+open class CKUser: User {
     
     let user: PUser
     
-    @objc public init(user: PUser) {
+    public init(user: PUser) {
         self.user = user
     }
     
-    public func userId() -> String {
+    open func userId() -> String {
         return user.entityID()
     }
     
-    public func userName() -> String {
+    open func userName() -> String? {
         return user.name()
     }
     
-    public func userImageUrl() -> URL? {
-        return URL(string: user.imageURL())
+    open func userImageUrl() -> URL? {
+        if let url = user.imageURL() {
+            return URL(string: url)
+        }
+        return nil
+    }
+    
+    open func userImage() -> UIImage? {
+        return user.imageAsImage()
+    }
+    
+    open func userIsMe() -> Bool {
+        return user.isMe()
+    }
+    
+    open func userIsOnline() -> Bool {
+        return user.online()?.boolValue ?? false
+    }
+    
+    open func userLastOnline() -> Date? {
+        if let module = BChatSDK.lastOnline() {
+            if let date = module.lastOnline(for: user) {
+                return date
+            } else {
+                module.getLastOnline(for: user)
+            }
+        }
+        return nil
     }
     
 }

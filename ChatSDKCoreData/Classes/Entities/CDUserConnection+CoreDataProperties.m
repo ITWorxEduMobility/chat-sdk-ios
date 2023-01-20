@@ -16,7 +16,8 @@
 @dynamic entityID;
 @dynamic meta;
 @dynamic type;
-@dynamic groups;
 @dynamic owner;
+@dynamic thread;
+@dynamic userAccountID;
 
 @end

@@ -7,43 +7,54 @@
 
 import Foundation
 import UIKit
-import LoremIpsum
 import KeepLayout
 
-@objc public enum BubbleMaskPosition: Int {
+public enum MaskPosition: Int {
+    case none
     case topRight
     case topLeft
     case bottomRight
     case bottomLeft
 }
 
-@objc public class MessageCell: UITableViewCell {
-    
-    @IBOutlet weak var avatarImageView: UIImageView!
-    @IBOutlet weak var timeLabel: UILabel!
-    @IBOutlet weak var contentContainerView: UIView!
-    @IBOutlet weak var bubbleMask: UIView!
-    @IBOutlet weak var readReceiptImageView: UIImageView?
+open class AbstractMessageCell: UITableViewCell {
 
-    var content: MessageContent?
+    open var content: MessageContent?
+
+    open func setContent(content: MessageContent) {
+        preconditionFailure("This method must be overridden")
+    }
+    open func bind(_ message: AbstractMessage, model: MessagesModel) {
+        preconditionFailure("This method must be overridden")
+    }
+}
+
+open class MessageCell: AbstractMessageCell {
     
+    @IBOutlet open weak var avatarImageView: UIImageView?
+    @IBOutlet open weak var timeLabel: UILabel?
+    @IBOutlet open weak var contentContainerView: UIView!
+    @IBOutlet open weak var readReceiptImageView: UIImageView?
+    @IBOutlet open weak var nameLabel: UILabel?
+        
     public required init?(coder: NSCoder) {
         super.init(coder: coder)
     }
     
-    override public func awakeFromNib() {
+    override open func awakeFromNib() {
         super.awakeFromNib()
-        
-        timeLabel.numberOfLines = 0
-        timeLabel.translatesAutoresizingMaskIntoConstraints = false
-
+        timeLabel?.numberOfLines = 0
+        timeLabel?.translatesAutoresizingMaskIntoConstraints = false
+        avatarImageView?.contentMode = .scaleAspectFill
+        readReceiptImageView?.keepWidth.equal = ChatKit.config().readReceiptImageWidth
+        readReceiptImageView?.keepHeight.equal = ChatKit.config().readReceiptImageHeight
+        backgroundColor = .clear
     }
     
-    @objc public func setContent(content: MessageContent) {
+    open override func setContent(content: MessageContent) {
         if self.content == nil {
             self.content = content
             contentContainerView.addSubview(content.view())
-//            contentContainerView.clipsToBounds = true
 
             content.view().keepInsets.equal = KeepRequired(0)
 
@@ -55,79 +66,141 @@ import KeepLayout
         }
     }
     
-    @objc public func bind(message: Message, model: MessagesViewModel) {
+    open override func bind(_ message: AbstractMessage, model: MessagesModel) {
         if let content = self.content {
-            content.bind(message: message)
+            content.bind(message, model: model)
         }
-        if let url = message.messageSender().userImageUrl() {
-            avatarImageView.sd_setImage(with: url, completed: nil)
+        if ChatKit.config().cacheUserImage, let image = message.messageSender().userImage() {
+            avatarImageView?.image = image
         }
-        timeLabel.text = model.messageTimeFormatter().string(from: message.messageDate())
-        
-        setAvatarSize(size: model.avatarSize())
+        else if let url = message.messageSender().userImageUrl() {
+            avatarImageView?.sd_setImage(with: url, placeholderImage: ChatKit.asset(icon: "icn_100_avatar"))
+        } else {
+            avatarImageView?.image = ChatKit.asset(icon: "icn_100_avatar")
+        }
+
+        if ChatKit.config().hideAvatarForOutgoingMessages {
+            if message.messageDirection() == .outgoing {
+                setAvatarSize(size: 0)
+            } else {
+                setAvatarSize(size: model.avatarSize())
+            }
+        } else {
+            setAvatarSize(size: model.avatarSize())
+        }
+
+        timeLabel?.text = model.messageTimeFormatter.string(from: message.messageDate())
+        if message.messageDirection() == .incoming {
+            timeLabel?.textColor = ChatKit.asset(color: ChatKit.config().incomingMessageTextColor)
+        }
+        if message.messageDirection() == .outgoing {
+            timeLabel?.textColor = ChatKit.asset(color: ChatKit.config().outgoingMessageTextColor)
+        }
+                     
+        if content?.showBubble() ?? true {
+            setBubbleColor(color: model.bubbleColor(message))
+            contentContainerView.setMaskPosition(direction: message.messageDirection())
+            content?.view().setMaskPosition(direction: message.messageDirection())
+        }
         
         if content?.showBubble() ?? true {
-            switch message.messageDirection() {
-            case .incoming:
-                setBubbleColor(color: model.incomingBubbleColor())
-                setBubbleMaskPosition(position: .topLeft)
-            case .outgoing:
-                setBubbleColor(color: model.outgoingBubbleColor())
-                setBubbleMaskPosition(position: .bottomRight)
+            if message.messageDirection() == .incoming {
+                contentContainerView.layer.borderWidth = CGFloat(ChatKit.config().incomingBubbleBorderWidth)
+                contentContainerView.layer.borderColor = ChatKit.asset(color: ChatKit.config().incomingBubbleBorderColor).cgColor
+            }
+            if message.messageDirection() == .outgoing {
+                contentContainerView.layer.borderWidth = CGFloat(ChatKit.config().outgoingBubbleBorderWidth)
+                contentContainerView.layer.borderColor = ChatKit.asset(color: ChatKit.config().outgoingBubbleBorderColor).cgColor
+            }
+        } else {
+            contentContainerView.layer.borderWidth = 0
+        }
+
+        if message.messageSender().userIsMe() {
+            // If the message failed to send, show a failure message
+            if let status = message.messageSendStatus() {
+                if status == .willSend {
+                    readReceiptImageView?.image = ChatKit.asset(icon: "icn_message_will_send")
+                } else if status == .failed {
+                    readReceiptImageView?.image = ChatKit.asset(icon: "icn_message_retry")
+                } else if let imageView = readReceiptImageView {
+                    switch message.messageReadStatus() {
+                    case .sent:
+                        imageView.image = ChatKit.asset(icon: "icn_message_sent")
+                    case .delivered:
+                        imageView.image = ChatKit.asset(icon: "icn_message_delivered")
+                    case .read:
+                        imageView.image = ChatKit.asset(icon: "icn_message_read")
+                    default:
+                        imageView.image = nil
+                    }
+                }
+            }
+        } else {
+            readReceiptImageView?.image = nil
+        }
+
+        if message.messageDirection() == .outgoing {
+            if readReceiptImageView?.image == nil {
+                timeLabel?.keepTrailingAlignTo(contentContainerView)?.equal = 2
+            } else {
+                timeLabel?.keepTrailingAlignTo(contentContainerView)?.deactivate()
+//                timeLabel?.keepRightInset.deactivate()
             }
         }
-                
-        if let imageView = readReceiptImageView {
-            switch message.messageReadStatus() {
-            case .sent:
-                imageView.image = UIImage(named: "icn_message_sent", in: model.bundle(), compatibleWith: nil)
-            case .delivered:
-                imageView.image = UIImage(named: "icn_message_delivered", in: model.bundle(), compatibleWith: nil)
-            case .read:
-                imageView.image = UIImage(named: "icn_message_read", in: model.bundle(), compatibleWith: nil)
-            default:
-                imageView.image = nil
-            }
-        }
+
+        hideNameLabel()
     }
 
-    @objc public func setAvatarSize(size: CGFloat) {
-        avatarImageView.keepSize.equal = size
-        avatarImageView.layer.cornerRadius = size / 2.0
+    open func setAvatarSize(size: CGFloat) {
+        avatarImageView?.keepSize.equal = KeepRequired(size)
+        avatarImageView?.layer.cornerRadius = size / 2.0
     }
 
-    @objc public func setBubbleColor(color: UIColor) {
+    open func setBubbleColor(color: UIColor) {
         contentContainerView.backgroundColor = color
-        bubbleMask.backgroundColor = color
     }
 
-    @objc public func setBubbleCornerRadius(radius: CGFloat) {
+    open func setBubbleCornerRadius(radius: CGFloat) {
         contentContainerView.layer.cornerRadius = radius
-        bubbleMask.keepSize.equal = radius
         content?.view().layer.cornerRadius = radius
     }
-
-    @objc public func setBubbleMaskPosition(position: BubbleMaskPosition) {
-        switch position {
-        case .topLeft:
-            bubbleMask.keepTopInset.equal = 0
-            bubbleMask.keepLeftInset.equal = 0
-        case .topRight:
-            bubbleMask.keepTopInset.equal = 0
-            bubbleMask.keepRightInset.equal = 0
-        case .bottomLeft:
-            bubbleMask.keepBottomInset.equal = 0
-            bubbleMask.keepLeftInset.equal = 0
-        case .bottomRight:
-            bubbleMask.keepBottomInset.equal = 0
-            bubbleMask.keepRightInset.equal = 0
-        }
+    
+    open func hideNameLabel() {
+        nameLabel?.keepHeight.equal = 0
     }
-        
+
+    open func showNameLabel() {
+        nameLabel?.keepHeight.equal = 17
+    }
+
 }
 
-extension MessageCell {
-    class func fromNib<T: MessageCell>(nib: UINib) -> T {
-        return nib.instantiate(withOwner: self, options: nil)[0] as! T
+public extension UIView {
+
+    func setMaskPosition(direction: MessageDirection) {
+        switch direction {
+        case .incoming:
+            setMaskPosition(position: .topLeft)
+        case .outgoing:
+            setMaskPosition(position: .bottomRight)
+        }
+    }
+
+    func setMaskPosition(position: MaskPosition) {
+        var mask: CACornerMask = [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMaxYCorner]
+        if position == .topLeft {
+            mask = [.layerMaxXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMaxYCorner]
+        }
+        if position == .topRight {
+            mask = [.layerMinXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMaxYCorner]
+        }
+        if position == .bottomLeft {
+            mask = [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMaxXMaxYCorner]
+        }
+        if position == .bottomRight {
+            mask = [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMinXMaxYCorner]
+        }
+        self.layer.maskedCorners = mask
     }
 }

@@ -34,7 +34,13 @@
 @synthesize delegate;
 
 -(instancetype) initWithNibName:(NSString *)nibNameOrNil bundle:(NSBundle *)nibBundleOrNil {
-    if ((self = [super initWithNibName:@"BLoginViewController" bundle:[NSBundle uiBundle]])) {
+    if (!nibNameOrNil) {
+        nibNameOrNil = @"BLoginViewController";
+    }
+    if (!nibBundleOrNil) {
+        nibBundleOrNil = NSBundle.uiBundle;
+    }
+    if ((self = [super initWithNibName:nibNameOrNil bundle:nibBundleOrNil])) {
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(keyboardWillShow:) name:UIKeyboardWillShowNotification object:Nil];
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(keyboardWillHide:) name:UIKeyboardWillHideNotification object:Nil];
     }
@@ -96,7 +102,7 @@
         self.passwordField.text = BChatSDK.config.debugPassword;
     }
     
-    _internetConnectionHook = [BHook hook:^(NSDictionary * data) {
+    _internetConnectionHook = [BHook hookOnMain:^(NSDictionary * data) {
         __typeof__(self) strongSelf = weakSelf;
         [strongSelf updateInterfaceForReachabilityStateChange];
     }];
@@ -114,7 +120,7 @@
 
 -(void) viewWillDisappear:(BOOL)animated {
     [super viewWillDisappear:animated];
-    [self.navigationController setNavigationBarHidden:NO animated:animated];
+//    [self.navigationController setNavigationBarHidden:NO animated:animated];
 }
 
 -(void) viewTapped {
@@ -166,7 +172,7 @@
                                                                                                    return Nil;
                                                                                                }, ^id(NSError * error) {
                                                                                                    __typeof__(self) strongSelf = weakSelf;
-                                                                                                   [strongSelf alertWithTitle:[NSBundle t:bErrorTitle] withError:error];
+                                                                                                   [strongSelf showAlertWithTitle:[NSBundle t:bErrorTitle] withError:error];
                                                                                                    return Nil;
                                                                                                });
     }
@@ -195,7 +201,7 @@
                     return Nil;
                 }, ^id(NSError * error) {
                     __typeof__(self) strongSelf = weakSelf;
-                    [strongSelf alertWithTitle:[NSBundle t:bErrorTitle] withError:error];
+                    [strongSelf showAlertWithTitle:[NSBundle t:bErrorTitle] withError:error];
                     [strongSelf hideHUD];
                     return Nil;
                 });
@@ -227,7 +233,7 @@
     [self presentViewController:nvc animated:YES completion:Nil];
 }
 
--(void) alertWithTitle: (NSString *) title withError: (NSError *) error {
+-(void) showAlertWithTitle: (NSString *) title withError: (NSError *) error {
 
     // Hide the HUD if login fails
     [self hideHUD];
@@ -236,10 +242,10 @@
     NSString * errorMessage = error.localizedDescription;
     if ([errorMessage rangeOfString:@"Error Code:"].length != 0) {
         NSArray * errorArray = [error.localizedDescription componentsSeparatedByString:@")"];
-        [UIView alertWithTitle:title withMessage:errorArray.lastObject];
+        [self alertWithTitle:title withMessage:errorArray.lastObject];
     }
     else {
-        [UIView alertWithTitle:title withError: error];
+        [self alertWithTitle:title withError: error];
     }
 }
 
@@ -259,7 +265,12 @@
     // Sometimes there are operations that take a very small amount of time
     // to complete - this messes up the animation. Really we only want to show the
     // HUD if the user is waiting over a certain amount of time
-    _timer = [NSTimer scheduledTimerWithTimeInterval:0.3 target:self selector:@selector(showHudNow) userInfo:Nil repeats:NO];
+    
+    __weak __typeof(self) weakSelf = self;
+    _timer = [NSTimer scheduledTimerWithTimeInterval:0.3 repeats:NO block:^(NSTimer * timer) {
+        __typeof(self) strongSelf = weakSelf;
+        [strongSelf showHudNow];
+    }];
 }
 
 -(void) showHudNow {

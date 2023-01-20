@@ -15,19 +15,15 @@
 
 #define bImagePath @"image"
 
-#define bCurrentUserLoginInfo @"current-user-login-info"
 #define bAuthenticationIDKey @"authentication-id"
 
 
 #define bDeletedKey @"deleted"
-#define bTokenKey @"token"
+#define bPushSent @"push-sent"
 
-// Deprecated in favour of bType
-#define bTypeV4 @"type_v4"
 #define bType @"type"
 #define bId @"id"
 #define bDate @"date"
-#define bUserFirebaseID @"user-firebase-id"
 #define bFrom @"from"
 #define bTo @"to"
 #define bReadOnly @"read-only"
@@ -35,14 +31,14 @@
 #define bMute @"mute"
 #define bUnmute @"unmute"
 
-// Deprecated in favour of bCreator
-#define bCreatorEntityID @"creator-entity-id"
 #define bCreator @"creator"
 #define bSenderEntityID @"sender-entity-id"
 #define bLastMessage @"lastMessage"
 #define bUserName @"userName"
 #define bReadPath @"read"
 #define bImageURL @"image-url"
+#define bNickname @"nick"
+#define bPermissionsPath @"permissions"
 
 #define bCreationDate @"creation-date"
 #define bMessage @"message"
@@ -54,7 +50,6 @@
 #define bStatusOwner @"owner"
 
 // Paths
-#define bDetailsPath @"details"
 #define bTypingPath @"typing" // Typing Indicator
 
 #define bUsersPath @"users"
@@ -65,7 +60,9 @@
 #define bPublicThreadsPath @"public-threads"
 #define bMetaPath @"meta"
 #define bOnlinePath @"online"
-#define bLastOnlinePath @"last-online"
+
+#define bLastOnlineKey @"last-online"
+#define bLastOnlinePath bLastOnlineKey
 
 #define bAudioPath @"audio"
 #define bVideoPath @"video"
@@ -74,6 +71,7 @@
 #define bLocationPath @"location"
 #define bTimeKey @"time"
 #define bNameKey @"name"
+#define bPublicKey @"public-key"
 
 #define bLoginTypeKey @"login-type"
 #define bLoginEmailKey @"login-email"
@@ -85,7 +83,6 @@
 #define bUserStatusTextKey bStatus
 #define bUserNameKey bNameKey
 #define bUserEmailKey @"email"
-#define bUserPublicKeysKey @"public-keys"
 #define bUserPhoneKey @"phone"
 #define bUserPrefixKey @"user"
 #define bUserImageURLKey @"pictureURL"
@@ -93,8 +90,16 @@
 
 #define bReplyKey @"reply"
 
+#define bHiddenKey @"hidden-"
+#define bMessageSendStatusKey @"hidden-send-status"
+
 #define bUserPrivilegeKey @"privilege"
 #define bUserNameLowercase @"name-lowercase"
 #define bUID @"uid"
+
+#define bLocalNotification @"local-notification"
+
+#define bCanDeleteMessagesFrom @"bCanDeleteMessagesFrom"
+#define bCallHistory @"bCallHistory"
 
 #endif /* BKeys_h */

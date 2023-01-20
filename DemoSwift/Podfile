@@ -1,0 +1,43 @@
+source 'https://github.com/CocoaPods/Specs.git'
+# plugin 'cocoapods-binary'
+
+use_frameworks!
+# enable_bitcode_for_prebuilt_frameworks!
+install! 'cocoapods', :disable_input_output_paths => true
+platform :ios, 13.0
+
+target 'ChatSDKSwift' do
+
+  pod "ChatSDK", :path => "../"
+  pod "ChatSDKFirebase/Adapter", :path => "../"
+  pod "ChatSDKFirebase/Upload", :path => "../"
+  pod "ChatSDKFirebase/Push", :path => "../"
+  pod "ChatSDKFirebase/FirebaseUI", :path => "../"
+
+  pod "ChatSDKPro/ContactBook", :path => "../"
+  pod "ChatSDKPro/Encryption", :path => "../"
+  pod "ChatSDKPro/Firebase", :path => "../"
+  pod "ChatSDKPro/FirebaseNearbyUsers", :path => "../"
+  pod "ChatSDKPro/Message", :path => "../"
+#  pod "ChatSDKPro/ChatK!t", :path => "../"
+
+  pod "ChatK!t", :path => "../"
+  pod "ChatK!t/ChatSDK", :path => "../"
+  pod "ChatK!t/ExtrasPro", :path => "../"
+
+#  pod "ChatSDKPro/XMPP", :path => "../"
+  
+  
+#  pod "ChatK!tExtras", :path => "../"
+
+#   pod "ChatSDKPro/ChatK!t", :path => "../"
+  
+end
+
+#post_install do |installer_representation|
+#    installer_representation.pods_project.targets.each do |target|
+#        target.build_configurations.each do |config|
+#            config.build_settings['OTHER_LDFLAGS'] = '$(inherited)'
+#        end
+#    end
+#end

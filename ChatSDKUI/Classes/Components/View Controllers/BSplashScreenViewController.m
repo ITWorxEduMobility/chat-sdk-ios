@@ -16,7 +16,13 @@
 @implementation BSplashScreenViewController
 
 -(instancetype) initWithNibName:(NSString *)nibNameOrNil bundle:(NSBundle *)nibBundleOrNil {
-    if((self = [super initWithNibName:@"BSplashScreenViewController" bundle:[NSBundle uiBundle]])) {
+    if (!nibNameOrNil) {
+        nibNameOrNil = @"BSplashScreenViewController";
+    }
+    if (!nibBundleOrNil) {
+        nibBundleOrNil = NSBundle.uiBundle;
+    }
+    if ((self = [super initWithNibName:nibNameOrNil bundle:nibBundleOrNil])) {
         _shouldPushViewControllerOnAuth = YES;
         _impl_shouldPushViewControllerOnAuth = YES;
     }
@@ -33,6 +39,7 @@
         self.imageView.image = BChatSDK.config.logoImage;
     }
     [self.navigationController setNavigationBarHidden:YES animated:NO];
+    self.navigationController.toolbarHidden = YES;
     
     [self stopActivityIndicator];
     
@@ -59,7 +66,7 @@
         [self pushLoginViewController];
     }
     
-    [BChatSDK.hook addHook:[BHook hook:^(NSDictionary * data) {
+    [BChatSDK.hook addHook:[BHook hookOnMain:^(NSDictionary * data) {
         if (self.impl_shouldPushViewControllerOnAuth) {
             NSString * type = data[bHook_AuthenticationType];
             if ([type isEqualToString:bHook_AuthenticationTypeCached]) {
@@ -74,7 +81,7 @@
         }
     }] withName:bHookDidAuthenticate];
     
-    [BChatSDK.hook addHook:[BHook hook:^(NSDictionary * data) {
+    [BChatSDK.hook addHook:[BHook hookOnMain:^(NSDictionary * data) {
         [self pushLoginViewController];
     }] withName:bHookDidLogout];
 }

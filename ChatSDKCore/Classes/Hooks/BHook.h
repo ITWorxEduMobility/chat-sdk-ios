@@ -11,7 +11,12 @@
 @interface BHook : NSObject
 
 +(instancetype) hook: (void(^)(NSDictionary *)) function;
--(instancetype) initWithFunction: (void(^)(NSDictionary *)) function;
++(instancetype) hookOnMain: (void(^)(NSDictionary *)) function;
+
++(instancetype) hook: (void(^)(NSDictionary *)) function weight: (int) weight;
++(instancetype) hookOnMain: (void(^)(NSDictionary *)) function weight: (int) weight;
+
 -(void) execute: (NSDictionary *) properties;
+-(int) weight;
 
 @end

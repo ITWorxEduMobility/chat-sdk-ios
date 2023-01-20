@@ -7,6 +7,7 @@
 
 #import "BMessageBuilder.h"
 #import <ChatSDK/Core.h>
+#import <ChatSDK/ChatSDK-Swift.h>
 
 @implementation BMessageBuilder
 
@@ -48,7 +49,7 @@
 }
 
 -(BMessageBuilder *) withType: (bMessageType) type {
-    [self type:bMessageTypeText];
+    [self type:type];
     return self;
 }
 
@@ -91,8 +92,11 @@
 
 -(BMessageBuilder *) imageMessage: (UIImage *) image{
     [self type:bMessageTypeImage];
-    _message.placeholder = UIImageJPEGRepresentation(image, 0);
     
+    // Rotate image to be correct orientation
+//    image = [UIImage fixedOrientationFor:image];
+    
+    _message.placeholder = UIImageJPEGRepresentation(image, 0.6);
     return self;
 }
 
@@ -100,10 +104,11 @@
     _message = [BChatSDK.db createMessageEntity];
     _message.entityID = BCoreUtilities.getUUID;
     
-    _message.date = [NSDate date];
+    _message.date = BChatSDK.core.now;
+    
     _message.userModel = BChatSDK.currentUser;
     [_message setDelivered: @NO];
-    [_message setRead: @YES];
+    [_message setRead: @NO];
     _message.flagged = @NO;
     
     return self;

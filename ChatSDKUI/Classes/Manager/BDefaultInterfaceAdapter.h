@@ -20,12 +20,11 @@
 @class BFlaggedMessagesViewController;
 @class BContactsViewController;
 @class BProfilePicturesViewController;
-@class UIViewController;
 @class BFriendsListViewController;
 @class BChatViewController;
 @class BSearchViewController;
-@protocol PUser;
 @class BLocalNotificationHandler;
+@class BDetailedEditProfileTableViewController;
 
 @protocol PThread;
 @protocol PUser;
@@ -36,20 +35,23 @@
     NSMutableArray * _additionalTabBarViewControllers;
     NSMutableDictionary * _additionalSearchViewControllers;
     NSMutableDictionary * _providers;
-
+    NSMutableArray * _settingsSections;
     NSMutableDictionary * _messageCellTypes;
 }
 
 @property (nonatomic, readwrite) UIViewController * privateThreadsViewController;
 @property (nonatomic, readwrite) UIViewController * publicThreadsViewController;
+@property (nonatomic, readwrite) UIViewController * editThreadViewController;
 @property (nonatomic, readwrite) UIViewController * flaggedMessagesViewController;
+@property (nonatomic, readwrite) ModerationProvider moderationViewController;
 @property (nonatomic, readwrite) UIViewController * contactsViewController;
 @property (nonatomic, readwrite) UIViewController * mainViewController;
 @property (nonatomic, readwrite) UIViewController * (^searchViewController)(NSArray * usersToExclude, void(^usersAdded)(NSArray * users));
 @property (nonatomic, readwrite) UIViewController * (^searchIndexViewController)(NSArray * indexes, void(^callback)(NSArray *));
-@property (nonatomic, readwrite) BFriendsListViewController * (^friendsListViewController)(NSArray * usersToExclude, void(^onComplete)(NSArray * users, NSString * groupName));
+@property (nonatomic, readwrite) BFriendsListViewController * (^friendsListViewController)(NSArray * usersToExclude, void(^onComplete)(NSArray * users, NSString * groupName, UIImage * image));
 @property (nonatomic, readwrite) UserProvider profileViewController;
 @property (nonatomic, readwrite) UserProvider profileOptionsViewController;
+@property (nonatomic, readwrite) BDetailedEditProfileTableViewController * editProfileViewController;
 
 @property (nonatomic, readwrite) UserProvider profilePicturesViewController;
 @property (nonatomic, readwrite) UIViewController * termsOfServiceViewController;

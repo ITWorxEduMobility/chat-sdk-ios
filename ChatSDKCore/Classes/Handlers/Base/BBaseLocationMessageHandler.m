@@ -11,12 +11,13 @@
 #import <MapKit/MapKit.h>
 
 #import <ChatSDK/Core.h>
+#import <ChatSDK/ChatSDK-Swift.h>
 
 @implementation BBaseLocationMessageHandler
 
 -(RXPromise *) sendMessageWithLocation:(CLLocation *)location withThreadEntityID:(NSString *)threadID {
     
-    [BChatSDK.db beginUndoGroup];
+//    [BChatSDK.db beginUndoGroup];
     
     id<PMessage> message = [BChatSDK.db createMessageEntity];
     
@@ -24,7 +25,7 @@
     
     id<PThread> thread = [BChatSDK.db fetchEntityWithID:threadID withType:bThreadEntity];
 
-    message.date = [NSDate date];
+    message.date = BChatSDK.core.now;
     message.userModel = BChatSDK.currentUser;
     [message setDelivered:@NO];
     [message setRead:@YES];
@@ -33,11 +34,17 @@
     [thread addMessage: message];
     
     // TODO: Get rid of this
-    NSString * messageText = [NSString stringWithFormat:@"%f,%f",location.coordinate.latitude,location.coordinate.longitude];
-
-    [message setMeta:@{bMessageText: messageText,
+//    NSString * messageText = [NSString stringWithFormat:@"%f,%f",location.coordinate.latitude,location.coordinate.longitude];
+    
+    int dim = BChatSDK.config.maxImageDimension;
+    NSString * url = [GoogleUtils getMapImageURLWithLatitude:location.coordinate.latitude longitude:location.coordinate.longitude width:dim height:dim];
+    
+    [message setMeta:@{bMessageText: [NSBundle t:bLocationMessage],
                        bMessageLongitude: @(location.coordinate.longitude),
-                       bMessageLatitude: @(location.coordinate.latitude)}];
+                       bMessageLatitude: @(location.coordinate.latitude),
+                       bMessageImageWidth: @(dim),
+                       bMessageImageHeight: @(dim),
+                       bMessageImageURL: url}];
     
     return [BChatSDK.thread sendMessage:message];
 

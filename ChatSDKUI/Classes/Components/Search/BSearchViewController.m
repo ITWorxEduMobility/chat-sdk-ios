@@ -143,7 +143,7 @@
     _tapRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(viewTapped)];
     
     NSOperatingSystemVersion version = [[NSProcessInfo processInfo] operatingSystemVersion];
-    if (version.majorVersion < 13) {
+    if (version.majorVersion < 13 || BChatSDK.config.alwaysShowBackButtonOnModalViews) {
         self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:[NSBundle t:bBack] style:UIBarButtonItemStylePlain target:self action:@selector(backButtonPressed)];
     }
 
@@ -175,13 +175,18 @@
     [super viewDidAppear:animated];
     
     __weak __typeof__(self) weakSelf = self;
-    _internetConnectionHook = [BHook hook:^(NSDictionary * data) {
+    _internetConnectionHook = [BHook hookOnMain:^(NSDictionary * data) {
         __typeof__(self) strongSelf = weakSelf;
         if (!BChatSDK.connectivity.isConnected) {
             [self dismissViewControllerAnimated:YES completion:nil];
         }
     }];
     [BChatSDK.hook addHook:_internetConnectionHook withName:bHookInternetConnectivityDidChange];
+    
+    if (_searchText) {
+        _searchController.searchBar.text = _searchText;
+        [self searchWithText:_searchText];
+    }
 }
 
 - (void)viewDidDisappear:(BOOL)animated {
@@ -280,6 +285,10 @@
     }
     [tableView_ reloadRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationAutomatic];
     [self updateRightBarButtonItem];
+}
+
+-(void) searchOnLoad: (NSString *) text {
+    _searchText = text;
 }
 
 -(void) searchWithText: (NSString *) text {

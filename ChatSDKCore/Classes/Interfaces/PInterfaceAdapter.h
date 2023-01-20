@@ -19,15 +19,20 @@
 @protocol PLocationViewController;
 @protocol PSplashScreenViewController;
 @protocol PProvider;
+@protocol PModerationViewController;
 
 @class BChatViewController;
 @class BFriendsListViewController;
 @class BChatOption;
 @class BTextInputView;
 @class BLocalNotificationHandler;
+@class SettingsSection;
+@class BDetailedEditProfileTableViewController;
+@class BDetailedProfileTableViewController;
 
 typedef UIViewController * (^UserProvider) (id<PUser> user);
 typedef UIViewController * (^ChatProvider) (id<PThread> thread);
+typedef UIViewController<PModerationViewController> * (^ModerationProvider) (id<PThread> thread, id<PUser> user);
 
 @protocol PInterfaceAdapter <NSObject>
 
@@ -37,11 +42,17 @@ typedef UIViewController * (^ChatProvider) (id<PThread> thread);
 -(void) setPublicThreadsViewController: (UIViewController *) controller;
 -(UIViewController *) publicThreadsViewController;
 
+-(void) setEditThreadsViewController: (UIViewController *) controller;
+-(UIViewController *) editThreadsViewController: (id<PThread>) thread didSave: (void(^)()) callback;
+
 -(void) setContactsViewController: (UIViewController *) controller;
 -(UIViewController *) contactsViewController;
 
 -(void) setProfileViewController: (UserProvider) provider;
 -(UIViewController *) profileViewControllerWithUser: (id<PUser>) user;
+
+-(void) setModerationViewController: (ModerationProvider) provider;
+-(UIViewController<PModerationViewController> *) moderationViewControllerWithThread: (id<PThread>) thread withUser: (id<PUser>) user;
 
 -(void) setProfilePicturesViewController: (UserProvider) provider;
 -(UIViewController *) profilePicturesViewControllerWithUser: (id<PUser>) user;
@@ -49,10 +60,11 @@ typedef UIViewController * (^ChatProvider) (id<PThread> thread);
 -(void) setProfileOptionsViewController: (UserProvider) provider;
 -(UIViewController *) profileOptionsViewControllerWithUser: (id<PUser>) user;
 
-/**
- * @deprecated Use mainViewController method instead
- */
--(UIViewController *) appTabBarViewController __deprecated;
+-(void) setEditProfileViewController: (BDetailedEditProfileTableViewController *) controller;
+-(UIViewController *) editProfileViewControllerWithParent: (BDetailedProfileTableViewController *) parent;
+
+-(void) setSettingsViewController: (UIViewController *) controller;
+-(UIViewController *) settingsViewController;
 
 -(void) setMainViewController: (UIViewController *) controller;
 -(UIViewController *) mainViewController;
@@ -67,9 +79,11 @@ typedef UIViewController * (^ChatProvider) (id<PThread> thread);
 // Use termsOfServiceNavigationController instead
 -(UINavigationController *) eulaNavigationController __deprecated;
 
--(void) setFriendsListViewController: (BFriendsListViewController * (^)(NSArray * usersToExclude, void(^onComplete)(NSArray * users, NSString * groupName))) provider;
--(BFriendsListViewController *) friendsViewControllerWithUsersToExclude: (NSArray *) usersToExclude onComplete: (void(^)(NSArray * users, NSString * name)) action;
--(UINavigationController *) friendsNavigationControllerWithUsersToExclude: (NSArray *) usersToExclude onComplete: (void(^)(NSArray * users, NSString * name)) action;
+-(void) setFriendsListViewController: (BFriendsListViewController * (^)(NSArray<PUser> * usersToExclude, void(^onComplete)(NSArray<PUser> * users, NSString * groupName, UIImage * image))) provider;
+
+-(BFriendsListViewController *) friendsViewControllerWithUsersToExclude: (NSArray<PUser> *) usersToExclude onComplete: (void(^)(NSArray<PUser> * users, NSString * name, UIImage * image)) action;
+
+-(UINavigationController *) friendsNavigationControllerWithUsersToExclude: (NSArray<PUser> *) usersToExclude onComplete: (void(^)(NSArray<PUser> * users, NSString * name, UIImage * image)) action;
 
 -(void) setChatViewController: (ChatProvider) provider;
 -(UIViewController *) chatViewControllerWithThread: (id<PThread>) thread;
@@ -98,6 +112,10 @@ typedef UIViewController * (^ChatProvider) (id<PThread> thread);
 
 -(void) addChatOption: (BChatOption *) option;
 -(void) removeChatOption: (BChatOption *) option;
+-(void) removeChatOptionWithTitle: (NSString *) title;
+
+-(void) addSettingsSection: (SettingsSection *) section;
+-(NSArray *) settingsSections;
 
 -(void) addTabBarViewController: (UIViewController *) controller atIndex: (int) index;
 -(void) removeTabBarViewControllerAtIndex: (int) index;

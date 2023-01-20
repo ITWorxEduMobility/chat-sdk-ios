@@ -30,13 +30,15 @@
 @synthesize groupNameView;
 @synthesize groupNameTextField;
 @synthesize maximumSelectedUsers;
+@synthesize groupImageView;
+@synthesize selectMediaAction = _selectMediaAction;
 
 // If we create it with a thread then we look at who is in the thread and make sure they don't come up on the lists
 // If we are creating a new thread then we don't mind
 
--(instancetype) initWithUsersToExclude: (NSArray *) users onComplete: (void(^)(NSArray * users, NSString * name)) action {
+-(instancetype) initWithUsersToExclude: (NSArray *) users onComplete: (void(^)(NSArray * users, NSString * name, UIImage * image)) action {
     if ((self = [self init])) {
-        self.title = [NSBundle t:bPickFriends];
+        self.title = [NSBundle t:bSelectUsers];
         [_contactsToExclude addObjectsFromArray:users];
         self.usersToInvite = action;
     }
@@ -46,7 +48,7 @@
 -(instancetype) init {
     self = [super initWithNibName:@"BFriendsListViewController" bundle:[NSBundle uiBundle]];
     if (self) {
-        self.title = [NSBundle t:bPickFriends];
+        self.title = [NSBundle t:bSelectUsers];
         _selectedContacts = [NSMutableArray new];
         _contacts = [NSMutableArray new];
         _contactsToExclude = [NSMutableArray new];
@@ -61,7 +63,7 @@
     groupNameTextField.delegate = self;
 
     NSOperatingSystemVersion version = [[NSProcessInfo processInfo] operatingSystemVersion];
-    if (version.majorVersion < 13) {
+    if (version.majorVersion < 13 || BChatSDK.config.alwaysShowBackButtonOnModalViews) {
         self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:[NSBundle t:bBack] style:UIBarButtonItemStylePlain target:self action:@selector(dismissView)];
     }
     
@@ -86,9 +88,6 @@
     
     [_tokenField setColorScheme:[UIColor colorWithRed:61/255.0f green:149/255.0f blue:206/255.0f alpha:1.0f]];
     
-//    _tokenView.layer.borderWidth = 0.5;
-    
-//    _tokenView.layer.borderColor = [UIColor colorWithRed:200/255.0 green:200/255.0 blue:200/255.0 alpha:1.0].CGColor;
     
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(keyboardWillShow:) name:UIKeyboardWillShowNotification object:Nil];
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(keyboardWillHide:) name:UIKeyboardWillHideNotification object:Nil];
@@ -99,13 +98,44 @@
 
     [self setGroupNameHidden:YES duration:0];
     
+    [groupImageView loadThreadImage:nil];
+    groupImageView.clipsToBounds = true;
+    groupImageView.layer.cornerRadius = 40;
+    
+    if ([BChatSDK.thread respondsToSelector:@selector(threadImagesSupported)] && BChatSDK.thread.threadImagesSupported) {
+        groupImageView.userInteractionEnabled = true;
+    }
+    
     [self traitCollectionDidChange:Nil];
+    
+    _selectMediaAction = [[BSelectMediaAction alloc] initWithType:bPictureTypeAlbumImage viewController:self squareCrop:YES];
+    
+    _imageTapGestureRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(selectImage)];
+    [groupImageView addGestureRecognizer:_imageTapGestureRecognizer];
+    
+}
+
+-(void) selectImage {
+    __weak __typeof(self) weakSelf = self;
+    [_selectMediaAction execute].thenOnMain(^id(id success) {
+        if(weakSelf.selectMediaAction.photo) {
+            groupImageView.image = weakSelf.selectMediaAction.photo;
+        }
+        return success;
+    }, nil);
+}
+
+-(void) showProgressView {
+    [MBProgressHUD showHUDAddedTo:self.view animated:YES];
+}
+
+-(void) hideProgressView {
+    [MBProgressHUD hideHUDForView:self.view animated:YES];
 }
 
 -(void) traitCollectionDidChange:(UITraitCollection *)previousTraitCollection {
-//    _tokenView.layer.borderColor = UIColor.systemGray3Color.CGColor;
-}
 
+}
 
 -(NSString *) getRightBarButtonActionTitle {
     if (self.rightBarButtonActionTitle) {
@@ -127,7 +157,7 @@
     [super viewWillAppear:YES];
     
     __weak __typeof__(self) weakSelf = self;
-    _internetConnectionHook = [BHook hook:^(NSDictionary * data) {
+    _internetConnectionHook = [BHook hookOnMain:^(NSDictionary * data) {
         __typeof__(self) strongSelf = weakSelf;
         if (!BChatSDK.connectivity.isConnected) {
             [self dismissViewControllerAnimated:YES completion:nil];
@@ -150,7 +180,7 @@
 
 -(void) setGroupNameHidden: (BOOL) hidden duration: (float) duration {
     [self.view keepAnimatedWithDuration: duration layout:^{
-        groupNameView.keepTopInset.equal = hidden ? -46 : 0;
+        groupNameView.keepTopInset.equal = hidden ? -134 : 0;
         groupNameView.alpha = hidden ? 0 : 1;
     }];
     if (!hidden) {
@@ -164,16 +194,15 @@
 }
 
 -(void) composeMessage {
-    
     if (!_selectedContacts.count) {
-        [UIView alertWithTitle:[NSBundle t:bInvalidSelection]
+        [self alertWithTitle:[NSBundle t:bInvalidSelection]
                    withMessage:[NSBundle t:bSelectAtLeastOneFriend]];
         return;
     }
     else {
         [self dismissViewControllerAnimated:YES completion:^{
             if (self.usersToInvite != Nil) {
-                self.usersToInvite(_selectedContacts, groupNameTextField.text);
+                self.usersToInvite(_selectedContacts, groupNameTextField.text, groupImageView.image);
             }
         }];
     }
@@ -292,7 +321,9 @@
         _filterByName = Nil;
         [_tokenField reloadData];
         
-        [self setGroupNameHidden:_selectedContacts.count < 2 || _contactsToExclude.count > 0 duration:0.4];
+        if (!self.hideGroupNameView) {
+            [self setGroupNameHidden:_selectedContacts.count < 2 || _contactsToExclude.count > 0 duration:0.4];
+        }
         
         [self reloadData];
     }
@@ -316,7 +347,9 @@
     [self.names removeObject:name];
     [_tokenField reloadData];
     
-    [self setGroupNameHidden:_selectedContacts.count + _contactsToExclude.count < 2 duration:0.4];
+    if (!self.hideGroupNameView) {
+        [self setGroupNameHidden:_selectedContacts.count + _contactsToExclude.count < 2 duration:0.4];
+    }
     
     [self reloadData];
 }
@@ -353,7 +386,16 @@
     
     [tableView reloadData];
     [self updateRightBarButtonActionTitle];
-    self.navigationItem.rightBarButtonItem.enabled = _selectedContacts.count;
+    
+    if(_selectedContacts.count == 1) {
+        self.navigationItem.rightBarButtonItem.enabled = YES;
+    } else if (_selectedContacts.count > 1 && (groupNameTextField.text.length > 0 || self.hideGroupNameView)) {
+        self.navigationItem.rightBarButtonItem.enabled = YES;
+    } else {
+        self.navigationItem.rightBarButtonItem.enabled = NO;
+    }
+    
+    
 }
 
 

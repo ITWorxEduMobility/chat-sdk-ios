@@ -18,6 +18,8 @@
 
 @synthesize imageView;
 @synthesize image;
+@synthesize imageURL;
+@synthesize activityIndicator;
 
 -(instancetype) initWithNibName:(NSString *)nibNameOrNil bundle:(NSBundle *)nibBundleOrNil
 {
@@ -33,23 +35,65 @@
     [super viewDidLoad];
     
     NSOperatingSystemVersion version = [[NSProcessInfo processInfo] operatingSystemVersion];
-    if (version.majorVersion < 13) {
+    if (version.majorVersion < 13 || BChatSDK.config.alwaysShowBackButtonOnModalViews) {
         self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:[NSBundle t: bBack] style:UIBarButtonItemStylePlain target:self action:@selector(backButtonPressed)];
     }
     
-    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:[NSBundle t: bSave] style:UIBarButtonItemStylePlain target:self action:@selector(save)];
+    if (!self.hideSaveButton) {
+        [self showSaveButton];
+    }
+
     _swipeRecognizer = [[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(swipeDownDetected)];
     _swipeRecognizer.direction = UISwipeGestureRecognizerDirectionDown;
     [self.view addGestureRecognizer:_swipeRecognizer];
+
+}
+
+-(void) setImageURL:(NSURL *)imageURL {
+    self->imageURL = imageURL;
+    image = nil;
 }
 
 -(void) swipeDownDetected {
     [self dismissViewControllerAnimated:YES completion:Nil];
 }
 
+-(void) showWaitingIndicator {
+    activityIndicator = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleGray];
+    [self navigationItem].rightBarButtonItem = [[UIBarButtonItem alloc] initWithCustomView:activityIndicator];;
+    [activityIndicator startAnimating];
+}
+
+-(void) showSaveButton {
+    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:[NSBundle t: bSave] style:UIBarButtonItemStylePlain target:self action:@selector(save)];
+}
+
 -(void) viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
-    [imageView setImage:image];
+    
+    if (!_hideSaveButton) {
+        [self showSaveButton];
+    }
+    
+    if (image) {
+        [imageView setImage:image];
+    }
+    else if (imageURL) {
+        __weak __typeof(self) weakSelf = self;
+        
+        [self showWaitingIndicator];
+        
+        [imageView sd_setImageWithURL:imageURL completed:^(UIImage * image, NSError * error, SDImageCacheType cacheType, NSURL * imageURL) {
+            
+            if (error) {
+                [self.view makeToast:error.localizedDescription];
+            } else {
+                weakSelf.image = image;
+                [weakSelf showSaveButton];
+            }
+            
+        }];
+    }
     
     // We want to make sure the image always fits in the screen
     // Check the ratio of the height and width against the screens ratio, use this to determine the height and width set
@@ -59,8 +103,9 @@
     CGRect screenSize = [UIScreen mainScreen].applicationFrame;
     
     // Make sure the status bar and navigation bar don't overlap our view
-    if ([self respondsToSelector:@selector(edgesForExtendedLayout)])
+    if ([self respondsToSelector:@selector(edgesForExtendedLayout)]) {
         self.edgesForExtendedLayout = UIRectEdgeNone;
+    }
     
     if (screenRatio >= imageRatio) {
         
@@ -97,7 +142,9 @@
 }
 
 -(void) save {
-    UIImageWriteToSavedPhotosAlbum(image, self, @selector(image:didFinishSavingWithError:contextInfo:), Nil);
+    if (image) {
+        UIImageWriteToSavedPhotosAlbum(image, self, @selector(image:didFinishSavingWithError:contextInfo:), Nil);
+    }
 }
 
 - (void)image:(UIImage *)image didFinishSavingWithError:(NSError *)error contextInfo:(void *)contextInfo  {
@@ -110,3 +157,4 @@
 }
 
 @end
+

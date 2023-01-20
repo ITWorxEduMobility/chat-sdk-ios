@@ -10,7 +10,9 @@
 
 #import <ChatSDK/PThread_.h>
 #import <ChatSDK/PMessage.h>
+#import <RXSwift/RXSwift-Swift.h>
 
+@protocol PUser;
 
 @protocol PThreadHandler <NSObject>
 
@@ -22,8 +24,15 @@
 
 -(RXPromise *) createThreadWithUsers: (NSArray *) users
                                 name: (NSString *) name
+                            imageURL: (NSString *) imageURL
                                 type: (bThreadType) type
+                            entityID: (NSString *) entityID
                          forceCreate: (BOOL) force
+                       threadCreated: (void(^)(NSError * error, id<PThread> thread)) threadCreated;
+
+-(RXPromise *) createThreadWithUsers: (NSArray *) users
+                                name: (NSString *) name
+                            imageURL: (NSString *) imageURL
                        threadCreated: (void(^)(NSError * error, id<PThread> thread)) threadCreated;
 
 -(RXPromise *) createThreadWithUsers: (NSArray *) users
@@ -44,12 +53,15 @@
 /**
  * @brief Add users to a thread
  */
--(RXPromise *) addUsers: (NSArray *) userIDs toThread: (id<PThread>) threadModel;
+-(RXPromise *) addUsers: (NSArray<PUser> *) users toThread: (id<PThread>) threadModel;
+-(BOOL) canAddUsers: (NSString *) threadEntityID;
 
 /**
  * @brief Remove users from a thread
  */
--(RXPromise *) removeUsers: (NSArray *) userIDs fromThread: (id<PThread>) threadModel;
+-(RXPromise *) removeUsers:(NSArray<NSString *> *)userEntityIDs fromThread:(NSString *) threadEntityID;
+-(BOOL) canRemoveUsers: (NSArray<NSString *> *) userEntityIDs fromThread: (NSString *) threadEntityID;
+-(BOOL) canRemoveUser: (NSString *) userEntityID fromThread: (NSString *) threadEntityID;
 
 /**
  * @brief Lazy loading of messages this method will load
@@ -67,6 +79,9 @@
 -(RXPromise *) leaveThread: (id<PThread>) thread;
 -(RXPromise *) joinThread: (id<PThread>) thread;
 
+-(BOOL) canLeaveThread: (id<PThread>) thread;
+-(BOOL) canJoinThread: (id<PThread>) thread;
+-(BOOL) canEditThread: (NSString *) threadEntityID;
 
 /**
  * @brief Send different types of message to a particular thread
@@ -100,18 +115,48 @@
 -(void) sendLocalSystemMessageWithText:(NSString *)text type: (bSystemMessageType) type withThreadEntityID:(NSString *)threadID;
 
 - (NSArray *)threadsWithUsers:(NSArray *)users type:(bThreadType)type;
-
-- (RXPromise *) deleteMessage: (NSString *)messageID;
-
--(BOOL) canDeleteMessage: (id<PMessage>) message;
+-(RXPromise *) pushThreadMeta: (NSString *) threadEntityID;
 
 -(RXPromise *) replyToMessage: (id<PMessage>) message withThreadID: (NSString *) threadEntityID reply: (NSString *) reply;
 -(RXPromise *) forwardMessage: (id<PMessage>) message toThreadWithID: (NSString *) threadEntityID;
 
+-(BOOL) canDeleteMessage: (id<PMessage>) message;
+-(RXPromise *) deleteMessage: (NSString *)messageID;
+
+// Permissions
+
+
+-(BOOL) rolesEnabled: (nonnull NSString *) threadEntityID;
+-(nonnull NSString *) role: (nonnull NSString *) threadEntityID forUser: (nonnull NSString *) userEntityID;
+-(BOOL) canChangeRole: (nonnull NSString *) threadEntityID forUser: (nonnull NSString *) userEntityID;
+-(nonnull RXPromise *) setRole: (nonnull NSString *) role forThread: (nonnull NSString *) threadEntityID forUser: (nonnull NSString *) userEntityID;
+-(nonnull NSArray<NSString *> *) availableRoles: (nonnull NSString *) threadEntityID forUser: (nonnull NSString *) userEntityID;
+
+-(BOOL) canChangeVoice: (nonnull NSString *) threadEntityID forUser: (nonnull NSString *) userEntityID;
+-(BOOL) hasVoice: (nonnull NSString *) threadEntityID forUser: (nonnull NSString *) userEntityID;
+-(nonnull RXPromise *) grantVoice: (nonnull NSString *) threadEntityID forUser: (nonnull NSString *) userEntityID;
+-(nonnull RXPromise *) revokeVoice: (nonnull NSString *) threadEntityID forUser: (nonnull NSString *) userEntityID;
+
+-(BOOL) canChangeModerator: (nonnull NSString *) threadEntityID forUser: (nonnull NSString *) userEntityID;
+-(BOOL) isModerator: (nonnull NSString *) threadEntityID forUser: (nonnull NSString *) userEntityID;
+-(nonnull RXPromise *) grantModerator: (nonnull NSString *) threadEntityID forUser: (nonnull NSString *) userEntityID;
+-(nonnull RXPromise *) revokeModerator: (nonnull NSString *) threadEntityID forUser: (nonnull NSString *) userEntityID;
+
+-(nonnull RXPromise *) canDelete: (nonnull NSString *) threadEntityID;
+
+-(BOOL) canMuteThreads;
+-(BOOL) canDestroyThread: (nonnull NSString *) threadEntityID;
+-(nonnull RXPromise *) refreshRoles: (nonnull NSString *) threadEntityID;
+
+
+
 @optional
 
--(RXPromise *) muteThread: (id<PThread>) thread;
--(RXPromise *) unmuteThread: (id<PThread>) thread;
+
+-(nonnull RXPromise *) muteThread: (nonnull id<PThread>) thread;
+-(nonnull RXPromise *) unmuteThread: (nonnull id<PThread>) thread;
+-(nonnull RXPromise *) destroyThread: (nonnull id<PThread>) thread;
+-(BOOL) threadImagesSupported;
 
 @end
 

@@ -31,6 +31,7 @@
         _additionalSearchViewControllers = [NSMutableDictionary new];
         _messageCellTypes = [NSMutableDictionary new];
         _providers = [NSMutableDictionary new];
+        _settingsSections = [NSMutableArray new];
         
         [self registerMessageWithCellClass:BTextMessageCell.class messageType:@(bMessageTypeText)];
         [self registerMessageWithCellClass:BImageMessageCell.class messageType:@(bMessageTypeImage)];
@@ -40,6 +41,13 @@
         // Setup default providers
         [self setProvider:[BMessageSectionDateProvider new] forName:bMessageSectionDateProvider];
         
+        if (@available(iOS 15.0, *)) {
+            UINavigationBarAppearance * appearance = [UINavigationBarAppearance new];
+            [appearance configureWithDefaultBackground];
+            [UINavigationBar.appearance setStandardAppearance:appearance];
+            [UINavigationBar.appearance setScrollEdgeAppearance:appearance];
+            [UINavigationBar.appearance setCompactAppearance:appearance];
+        }
 
     }
     return self;
@@ -86,6 +94,15 @@
     return _publicThreadsViewController;
 }
 
+-(UIViewController *) editThreadsViewController: (id<PThread>) thread didSave: (void(^)()) callback {
+    if (!_editThreadViewController) {
+        EditThreadViewController * vc = [[EditThreadViewController alloc] initWithNibName:nil bundle:nil thread:thread];
+        [vc setDidSaveCallbackWithCallback:callback];
+        _editThreadViewController = vc;
+    }
+    return _editThreadViewController;
+}
+
 -(UIViewController *) flaggedMessagesViewController {
     if (!_flaggedMessagesViewController) {
         _flaggedMessagesViewController = [[BFlaggedMessagesViewController alloc] init];
@@ -100,6 +117,30 @@
     return [[ProfileOptionsViewController alloc] initWithUser:user];
 }
 
+-(void) setModerationViewController: (ModerationProvider) provider {
+    self.moderationViewController = provider;
+}
+
+-(UIViewController<PModerationViewController> *) moderationViewControllerWithThread: (id<PThread>) thread withUser: (id<PUser>) user {
+    if (_moderationViewController) {
+        return _moderationViewController(thread, user);
+    }
+    return [[ModerationViewController alloc] initWithThread:thread user:user nibName:nil bundle:nil];
+}
+
+-(void) setEditProfileViewController: (BDetailedEditProfileTableViewController *) controller {
+    _editProfileViewController = controller;
+}
+
+-(UIViewController *) editProfileViewControllerWithParent: (BDetailedProfileTableViewController *) parent {
+    if (!_editProfileViewController) {
+        _editProfileViewController = [[UIStoryboard storyboardWithName:@"DetailedProfile"
+                                                                bundle:[NSBundle uiBundle]] instantiateViewControllerWithIdentifier:@"EditProfile"];
+    }
+    _editProfileViewController.profileViewController = parent;
+    return _editProfileViewController;
+}
+
 -(UIViewController *) contactsViewController {
     if (!_contactsViewController) {
         _contactsViewController = [[BContactsViewController alloc] init];
@@ -107,18 +148,15 @@
     return _contactsViewController;
 }
 
--(BFriendsListViewController *) friendsViewControllerWithUsersToExclude: (NSArray *) usersToExclude onComplete: (void(^)(NSArray * users, NSString * groupName)) action{
+-(BFriendsListViewController *) friendsViewControllerWithUsersToExclude: (NSArray<PUser> *) usersToExclude onComplete: (void(^)(NSArray<PUser> * users, NSString * groupName, UIImage * image)) action{
     if (_friendsListViewController != Nil) {
         return _friendsListViewController(usersToExclude, action);
     }
     return [[BFriendsListViewController alloc] initWithUsersToExclude:usersToExclude onComplete:action];
 }
 
--(UINavigationController *) friendsNavigationControllerWithUsersToExclude: (NSArray *) usersToExclude onComplete: (void(^)(NSArray * users, NSString * name)) action {
+-(UINavigationController *) friendsNavigationControllerWithUsersToExclude: (NSArray<PUser> *) usersToExclude onComplete: (void(^)(NSArray<PUser> * users, NSString * name, UIImage * image)) action {
     return [self navigationControllerWithRootViewController:[self friendsViewControllerWithUsersToExclude:usersToExclude onComplete:action]];
-}
--(UIViewController *) appTabBarViewController __deprecated {
-    return [self splashScreenNavigationController];
 }
 
 -(UIViewController *) mainViewController {
@@ -226,11 +264,11 @@
         [options addObject:[[BMediaChatOption alloc] initWithType:bPictureTypeCameraVideo]];
     }
     else if (imageEnabled)  {
-        [options addObject:[[BMediaChatOption alloc] initWithType:bPictureTypeCameraImage]];
+        [options addObject:[[BMediaChatOption alloc] initWithType:bPictureTypeCameraImage cropperEnabled:YES]];
     }
     
     if (imageEnabled) {
-        [options addObject:[[BMediaChatOption alloc] initWithType:bPictureTypeAlbumImage]];
+        [options addObject:[[BMediaChatOption alloc] initWithType:bPictureTypeAlbumImage cropperEnabled:YES]];
     }
     if (videoEnabled) {
         [options addObject:[[BMediaChatOption alloc] initWithType:bPictureTypeAlbumVideo]];
@@ -267,7 +305,10 @@
 }
 
 -(UIViewController<PImageViewController> *) imageViewController {
-    return [[BImageViewController alloc] initWithNibName:nil bundle:Nil];
+    if (!_imageViewController) {
+        _imageViewController = [[BImageViewController alloc] initWithNibName:nil bundle:Nil];
+    }
+    return _imageViewController;
 }
 
 -(UINavigationController *) imageViewNavigationController {
@@ -353,6 +394,18 @@
     }
 }
 
+-(void) removeChatOptionWithTitle: (NSString *) title {
+    BChatOption * toRemove;
+    for(BChatOption * option in _additionalChatOptions) {
+        if ([option.title isEqualToString:title]) {
+            toRemove = option;
+            break;
+        }
+    }
+    [self removeChatOption:toRemove];
+}
+
+
 -(UIViewController *) settingsViewController {
     return _settingsViewController;
 }
@@ -420,6 +473,14 @@
 
 -(void) setLocalNotificationHandler:(BOOL(^)(id<PThread>)) handler {
     showLocalNotification = handler;
+}
+
+-(void) addSettingsSection: (SettingsSection *) section {
+    [_settingsSections addObject:section];
+}
+
+-(NSArray *) settingsSections {
+    return _settingsSections;
 }
 
 @end

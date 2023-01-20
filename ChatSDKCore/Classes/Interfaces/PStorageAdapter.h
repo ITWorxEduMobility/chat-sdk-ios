@@ -18,19 +18,12 @@
 #define bUserAccountEntity @"CDUserAccount"
 #define bMetaDataEntity @"CDMetaData"
 #define bUserConnectionEntity @"CDUserConnection"
-#define bGroupEntity @"CDGroup"
 
-#define bMessageOrderNewestFirst = 1;
-#define bMessageOrderOldestFirst = 2;
-
-@class BMessageDef;
-@class BThreadDef;
 @class NSFetchRequest;
 
-typedef enum {
-    bQueueTypeMain,
-    bQueueTypeBackground,
-} bQueueType;
+typedef void(^CompletionArray)(NSArray *);
+typedef void(^Completion)(void);
+typedef void(^CompletionInt)(int);
 
 @protocol PStorageAdapter <NSObject>
 
@@ -39,14 +32,28 @@ typedef enum {
 -(id) fetchEntityWithID: (NSString *) entityID withType: (NSString *) type;
 -(id) fetchOrCreateEntityWithID: (NSString *) entityID withType: (NSString *) type;
 -(id) fetchOrCreateEntityWithPredicate: (NSPredicate *) predicate withType: (NSString *) type;
+-(NSUInteger) fetchEntityCountWithID: (NSString *) entityID withType: (NSString *) type;
+-(BOOL) entityExistsWithID: (NSString *) entityID withType: (NSString *) type;
+
+-(id) fetchOrCreateUserConnectionWithID: (NSString *) entityID withType: (bUserConnectionType) type;
+
 -(id<PThread>) fetchThreadWithUsers: (NSArray *) users;
 -(id) executeFetchRequest: (NSFetchRequest *) fetchRequest entityName: (NSString *) entityName predicate: (NSPredicate *) predicate;
+
+-(int) unreadMessagesCountNow: (NSString *) threadEntityID;
+
+-(RXPromise *) privateThreadUnreadMessageCount;
+-(RXPromise *) publicThreadUnreadMessageCount;
+-(RXPromise *) unreadMessagesCount: (NSString *) threadEntityID;
+
+-(void) threadsWithType: (bThreadType) type then: (CompletionArray) completion;
+-(NSArray *) threadsWithType: (bThreadType) type;
+
+-(void) unreadMessages: (NSString *) threadEntityID then: (CompletionArray) completion;
 
 -(id<PMessage>) createMessageEntity;
 -(id<PThread>) createThreadEntity;
 
--(RXPromise *) save;
--(void) saveToStore;
 
 -(id) createEntity: (NSString *) entityName;
 
@@ -72,13 +79,13 @@ typedef enum {
 -(NSArray<PMessage> *) loadMessagesForThread: (id<PThread>) thread newest: (int) count;
 -(NSArray<PMessage> *) loadMessagesForThread: (id<PThread>) thread oldest: (int) count;
 
-//-(RXPromise *) performOnPrivate: (id (^)(void)) block;
--(RXPromise *) performOnMain: (id (^)(void)) block;
+-(void) performOnMain: (Completion) block;
+-(void) performOnMainAndWait:(Completion) block;
+-(void) saveFinally: (Completion) completion;
 
-//-(RXPromise *) performOnPrivateAndSave:(id (^)(void))block;
--(RXPromise *) performOnMainAndSave:(id (^)(void))block;
-
--(bQueueType) queueType;
+-(void) performOnMainAndSave:(Completion)beforeSave finally: (Completion) afterSave;
+-(void) save;
+-(void) saveBackground;
 
 
 @end

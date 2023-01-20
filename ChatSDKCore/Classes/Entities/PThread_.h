@@ -46,7 +46,8 @@ typedef enum {
     
     bThreadFilterPublic = bThreadTypePublicGroup | bThreadTypePublicBroadcast,
     bThreadFilterGroup = bThreadTypePrivateGroup | bThreadTypePublicGroup | bThreadFilterBroadcast,
-    
+    bThreadFilterAll = 0xFFFF,
+
     bThreadFilterPrivateThread = bThreadTypePrivateGroup | bThreadType1to1,
     
 } bThreadType;
@@ -72,17 +73,25 @@ typedef enum {
 -(void) setDeletedDate: (NSDate *) date;
 -(NSDate *) deletedDate;
 
--(void) addUser: (id<PUser>) user;
--(void) removeUser:(id<PUser>) user;
+-(BOOL) addUser: (id<PUser>) user;
+-(BOOL) removeUser:(id<PUser>) user;
+
+-(void) addMessageAndSort: (id<PMessage>) message;
 -(void) addMessage: (id<PMessage>) message;
 -(void) addMessage: (id<PMessage>) theMessage toStart: (BOOL) toStart;
 -(void) removeMessage: (id<PMessage>) message;
+-(void) removeAllMessages;
+
+-(BOOL) containsUser: (id<PUser>) user;
 
 -(NSString *) displayName;
 
 -(NSSet *) users;
 -(id<PUser>) otherUser;
 -(id<PMessage>) newestMessage;
+
+// Active members - i.e. doesn't include banned members
+-(NSArray<PUser> *) members;
 
 -(void) markRead;
 -(int) unreadMessageCount;
@@ -98,7 +107,10 @@ typedef enum {
 -(NSArray *) allMessages;
 -(BOOL) hasMessages;
 
--(RXPromise *) imageForThread;
+-(NSString *) imageURL;
+-(void) setImageURL: (NSString *) url;
+
+
 -(NSDate *) orderDate;
 
 -(void) setMeta: (NSDictionary *) meta;
@@ -110,6 +122,17 @@ typedef enum {
 
 -(void) setDraft: (NSString *) draft;
 -(NSString *) draft;
+-(BOOL) typeIs: (bThreadType) type;
  
+-(BOOL) addConnection: (PUser *) user;
+-(BOOL) removeConnection: (PUser *) user;
+-(NSArray<PUserConnection> *) connections;
+-(id<PUserConnection>) connection: (NSString *) entityID;
+
+-(void) markDeleted: (BOOL) notify;
+
+-(void) setCanDeleteMessagesFromDate: (NSDate *) date;
+-(NSDate *) canDeleteMessagesFromDate;
+
 @end
 

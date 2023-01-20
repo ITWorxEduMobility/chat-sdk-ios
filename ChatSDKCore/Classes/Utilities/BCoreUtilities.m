@@ -8,12 +8,14 @@
 
 #import "BCoreUtilities.h"
 //#import <DateTools.h>
-#import <ChatSDK/Core.h> 
+#import <ChatSDK/Core.h>
+#import <CommonCrypto/CommonDigest.h>
 
 @implementation BCoreUtilities
 
 + (NSURL *)getDocumentsURL {
     return [[[NSFileManager defaultManager] URLsForDirectory:NSDocumentDirectory inDomains:NSUserDomainMask] firstObject];
+//    return [NSURL URLWithString:[NSHomeDirectory() stringByAppendingString:@"/Documents/"]];
 }
 
 +(RXPromise *) fetchImageFromURL:(NSURL *)url {
@@ -31,7 +33,7 @@
     }, nil);
 }
 
-+(NSString *)getUUID {
++(nonnull NSString *)getUUID {
     return [[NSUUID UUID] UUIDString];
 }
 
@@ -197,6 +199,40 @@
     return manager;
 }
 
++(void) checkOnMain {
+    if ([[NSThread currentThread] isEqual:[NSThread mainThread]]) {
+        [BChatSDK.shared.logger log: @"On Main Thread"];
+    } else {
+        [BChatSDK.shared.logger log: @"On Background Thread"];
+    }
+}
 
++(void) checkDuplicateThread {
+    NSArray * threads = [BChatSDK.db fetchEntitiesWithName:bThreadEntity];
+    for(id o1 in threads) {
+        for(id o2 in threads) {
+            if (![o1 isEqual:o2]) {
+                id<PThread> t1 = (id<PThread>) o1;
+                id<PThread> t2 = (id<PThread>) o2;
+                if ([t1.entityID isEqual:t2.entityID]) {
+                    [BChatSDK.shared.logger log: @"Duplicate thread"];
+                }
+            }
+        }
+    }
+}
 
++(NSString *)md5: (NSString *) input {
+    const char *cStr = [input UTF8String];
+    unsigned char result[CC_MD5_DIGEST_LENGTH];
+    CC_MD5( cStr, (CC_LONG)strlen(cStr), result );
+
+    return [NSString stringWithFormat:
+        @"%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X",
+        result[0], result[1], result[2], result[3],
+        result[4], result[5], result[6], result[7],
+        result[8], result[9], result[10], result[11],
+        result[12], result[13], result[14], result[15]
+    ];
+}
 @end

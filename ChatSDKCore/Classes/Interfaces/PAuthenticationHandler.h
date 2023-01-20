@@ -13,12 +13,13 @@
 #import <ChatSDK/BAccountTypes.h>
 #import <ChatSDK/BAccountDetails.h>
 
+@protocol PUser;
+
 @protocol PAuthenticationHandler <NSObject>
 
 /**
  * @brief Check to see if the user is already authenticated
  */
--(RXPromise *) authenticateWithCachedToken __deprecated;
 -(RXPromise *) authenticate;
 
 /**
@@ -27,15 +28,10 @@
 -(RXPromise *) authenticateWithDictionary: (NSDictionary *) details;
 -(RXPromise *) authenticate: (BAccountDetails *) details;
 
-/**
- * @brief Checks whether the user has been authenticated this session
- */
--(BOOL) userAuthenticated __deprecated;
--(BOOL) userAuthenticatedThisSession __deprecated;
-
 -(BOOL) isAuthenticated;
 -(BOOL) isAuthenticatedThisSession;
 -(BOOL) cachedCredentialAvailable;
+-(NSString *) cachedPassword;
 
 /**
  * @brief Logout the user from the current account
@@ -50,26 +46,18 @@
 -(BOOL) accountTypeEnabled: (bAccountType) type;
 
 /**
- * @brief Get the user's stored login credentials
- */
--(NSDictionary *) loginInfo;
-
-/**
- * @brief Set the user's stored login credentials
- */
--(void) setLoginInfo: (NSDictionary *) info;
-
-/**
- * @brief Save the user's login credentials
- */
--(void) saveAccountDetails: (BAccountDetails *) details;
--(BAccountDetails *) getSavedAccountDetails;
-/**
  * @brief Get the current user's authentication id
  */
--(NSString *) currentUserEntityID;
+-(NSString *) currentUserID;
+-(void) setCurrentUserID: (NSString *) currentUserID;
+-(void) clearCurrentUserID;
+-(id<PUser>) currentUser;
 
 -(RXPromise *) resetPasswordWithCredential: (NSString *) credential;
+
+@optional
+
+-(void) activate;
 
 @end
 

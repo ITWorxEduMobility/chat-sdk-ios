@@ -11,6 +11,13 @@
 
 #import <ChatSDK/PUser.h>
 
+typedef enum {
+    bConnectionStatusNone,
+    bConnectionStatusConnected,
+    bConnectionStatusConnecting,
+    bConnectionStatusDisconnected,
+} bConnectionStatus;
+
 @class RXPromise;
 
 @protocol PCoreHandler <NSObject>
@@ -19,12 +26,12 @@
  * @brief Update the user on the server
  */
 -(RXPromise *) pushUser;
+-(RXPromise *) pushUser: (BOOL) uploadAvatar;
 
 /**
  * @brief Return the current user data
  */
 -(id<PUser>) currentUserModel;
--(RXPromise *) currentUserModelAsync;
 
 // TODO: Consider removing / refactoring this
 /**
@@ -50,7 +57,8 @@
  */
 -(RXPromise *)observeUser: (NSString *)entityID;
 
-
+// Get all contacts and all users we share threads with
+-(NSArray<PUser> *) allKnownUsers;
 
 -(id<PUser>) userForEntityID: (NSString *) entityID;
 
@@ -61,9 +69,13 @@
  * changes are lost. Calling save forces Core Data to persist the data to perminant storage
  */
 -(void) save;
+-(nonnull NSDate *) now;
 
-// Save the data to perminent storage
--(void) saveToStore;
+@optional
+
+-(bConnectionStatus) connectionStatus;
+-(void) reconnect;
+-(void) activate; 
 
 
 @end

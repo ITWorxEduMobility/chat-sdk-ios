@@ -6,14 +6,15 @@
 //
 
 #import <Foundation/Foundation.h>
+#import <UserNotifications/UserNotifications.h>
 #import <ChatSDK/PNetworkAdapter.h>
-
 
 @class BConfiguration;
 @class RXPromise;
 @class BBackgroundPushNotificationQueue;
 @class BInternetConnectivity;
 @class BModuleHelper;
+@class Settings;
 
 @class Colors;
 @class Icons;
@@ -21,6 +22,8 @@
 @protocol PInterfaceAdapter;
 @protocol PUser;
 @protocol PStorageAdapter;
+@protocol PLogger;
+@protocol PModule;
 
 @interface BChatSDK : NSObject {
     BConfiguration * _configuration;
@@ -29,6 +32,11 @@
     id<PNetworkAdapter> _networkAdapter;
     BBackgroundPushNotificationQueue * _pushQueue;
     BModuleHelper * _moduleHelper;
+    id<PLogger> _logger;
+    Settings * _settings;
+    NSMutableArray<PModule> * _modules;
+    NSArray * _identifier;
+    NSMutableArray<UNUserNotificationCenterDelegate> * _notificationHandlers;
 }
 
 @property (nonatomic, readonly) BConfiguration * configuration;
@@ -38,18 +46,26 @@
 @property (nonatomic, readwrite) NSBundle * colorsBundle;
 @property (nonatomic, readwrite) NSBundle * bundle;
 @property (nonatomic, readwrite) NSBundle * iconsBundle;
+@property (nonatomic, readwrite) id<PLogger> logger;
+@property (nonatomic, readwrite) Settings * settings;
+@property (nonatomic, readwrite) NSMutableArray<PModule> * modules;
+@property (nonatomic, readonly) NSArray * identifier;
+@property (nonatomic, readonly) NSMutableArray<UNUserNotificationCenterDelegate> * notificationHandlers;
 
-+(BChatSDK *) shared;
+
++(nonnull BChatSDK *) shared;
 
 // Application lifecycle methods - should be called from App Delegate
-+(void) initialize: (BConfiguration *) config app:(UIApplication *)application options:(NSDictionary *)launchOptions;
-+(void) initialize: (BConfiguration *) config app:(UIApplication *)application options:(NSDictionary *)launchOptions interfaceAdapter: (id<PInterfaceAdapter>) adapter;
++(void) initialize: (BConfiguration *) config app:(UIApplication *)application options:(NSDictionary *)launchOptions modules: (NSArray<PModule> *) modules;
++(void) initialize: (BConfiguration *) config app:(UIApplication *)application options:(NSDictionary *)launchOptions  modules: (NSArray<PModule> *) modules networkAdapter:(nullable id<PNetworkAdapter>)networkAdapter interfaceAdapter:(nullable id<PInterfaceAdapter>)interfaceAdapter;
 
 +(BOOL) application:(UIApplication *)application openURL:(NSURL *)url sourceApplication:(NSString *)sourceApplication annotation:(id)annotation;
 +(BOOL) application:(UIApplication *)app openURL:(NSURL *)url options:(NSDictionary<UIApplicationOpenURLOptionsKey,id> *)options;
+
 +(void) application:(UIApplication *)application didRegisterForRemoteNotificationsWithDeviceToken:(NSData *)deviceToken;
 +(void) application:(UIApplication *)application didReceiveRemoteNotification:(NSDictionary *)userInfo;
--(void) initialize: (BConfiguration *) config app:(UIApplication *)application options:(NSDictionary *)launchOptions interfaceAdapter: (id<PInterfaceAdapter>) adapter;
+
+-(void) initialize: (BConfiguration *) config app:(UIApplication *)application options:(NSDictionary *)launchOptions  modules: (NSArray<PModule> *) modules networkAdapter:(id<PNetworkAdapter>)networkAdapter interfaceAdapter:(id<PInterfaceAdapter>)adapter;
 
 // Integration helper methods
 
@@ -60,9 +76,6 @@
 // the user has been authenticated correctly by using the post auth hook
 +(void) updateUserWithName: (NSString *) name image: (UIImage *) image url: (NSString *) url;
 
--(void) preventAutomaticActivationForModule: (NSString *) moduleName;
--(BOOL) activateModuleForName: (NSString *) name;
-
 // Logout
 +(RXPromise *) logout;
 
@@ -71,39 +84,48 @@
 -(BBackgroundPushNotificationQueue *) pushQueue;
 
 // API Methods
-+(id<PCoreHandler>) core;
-+(id<PAuthenticationHandler>) auth;
-+(id<PUploadHandler>) upload;
-+(id<PVideoMessageHandler>) videoMessage;
-+(id<PAudioMessageHandler>) audioMessage;
-+(id<PImageMessageHandler>) imageMessage;
-+(id<PLocationMessageHandler>) locationMessage;
-+(id<PPushHandler>) push;
-+(id<PContactHandler>) contact;
-+(id<PTypingIndicatorHandler>) typingIndicator;
-+(id<PModerationHandler>) moderation;
-+(id<PSearchHandler>) search;
-+(id<PPublicThreadHandler>) publicThread;
-+(id<PBlockingHandler>) blocking;
-+(id<PLastOnlineHandler>) lastOnline;
-+(id<PNearbyUsersHandler>) nearbyUsers;
-+(id<PReadReceiptHandler>) readReceipt;
-+(id<PStickerMessageHandler>) stickerMessage;
++(nonnull id<PCoreHandler>) core;
++(nonnull id<PAuthenticationHandler>) auth;
++(nullable id<PUploadHandler>) upload;
++(nullable id<PVideoMessageHandler>) videoMessage;
++(nullable id<PAudioMessageHandler>) audioMessage;
++(nullable id<PImageMessageHandler>) imageMessage;
++(nullable id<PLocationMessageHandler>) locationMessage;
++(nullable id<PPushHandler>) push;
++(nonnull id<PContactHandler>) contact;
++(nullable id<PTypingIndicatorHandler>) typingIndicator;
++(nullable id<PModerationHandler>) moderation;
++(nonnull id<PSearchHandler>) search;
++(nullable id<PPublicThreadHandler>) publicThread;
++(nullable id<PBlockingHandler>) blocking;
++(nullable id<PLastOnlineHandler>) lastOnline;
++(nullable id<PNearbyUsersHandler>) nearbyUsers;
++(nullable id<PReadReceiptHandler>) readReceipt;
++(nullable id<PStickerMessageHandler>) stickerMessage;
 +(id<PUser>) currentUser;
 +(NSString *) currentUserID;
 +(id) handler: (NSString *) name;
-+(id<PHookHandler>) hook;
-+(id<PUsersHandler>) users;
-//+(BOOL) isMe: (id<PUser>) user;
-+(id<PInterfaceAdapter>) ui;
-+(id<PStorageAdapter>) db;
-+(id<PNetworkAdapter>) a;
-+(id<PFileMessageHandler>) fileMessage;
-+(id<PEncryptionHandler>) encryption;
-+(id<PEventHandler>) event;
-+(id<PThreadHandler>) thread;
-+(id<PInternetConnectivityHandler>) connectivity;
++(nonnull id<PHookHandler>) hook;
++(nonnull id<PUsersHandler>) users;
 
-+(BConfiguration *) config;
++(nonnull id<PInterfaceAdapter>) ui;
++(nonnull id<PStorageAdapter>) db;
++(nonnull id<PNetworkAdapter>) a;
++(nullable id<PFileMessageHandler>) fileMessage;
++(nullable id<PEncryptionHandler>) encryption;
++(nonnull id<PEventHandler>) event;
++(nonnull id<PThreadHandler>) thread;
++(nullable id<PInternetConnectivityHandler>) connectivity;
++(nullable id<CallHandler>) call;
++(nullable id<GifMessageHandler>) gifMessage;
+
++(nonnull BConfiguration *) config;
+
++(void) activateLicenseWithEmail: (NSString *) email;
++(void) activateLicenseWithPatreon: (NSString *) patreonId;
++(void) activateLicenseWithGithub: (NSString *) githubId;
+
+-(void) addNotificationHandlers: (id<UNUserNotificationCenterDelegate>) delegate;
 
 @end
+

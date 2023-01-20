@@ -1,0 +1,34 @@
+"tapHereForContactInfo" = "Tap here for contact info";
+"tapHereForGroupInfo" = "Tap here for group info";
+
+"conversation" = "Conversation";
+"online" = "Online";
+"offline" = "Offline";
+"connecting" = "Connecting";
+"copiedToClipboard" = "Copied to Clipboard";
+"location" = "Location";
+"gallery" = "Gallery";
+"" = "";
+"grantCameraPermission" = "Grant camera permission to take a photo";
+
+"today" = "Today";
+"yesterday" = "Yesterday";
+"lastSeen_at_" = "Last seen %@ at %@";
+"requestAudioPermission" = "Click enable audio recording";
+"audioPermissionDenied" = "Audio permission denied";
+
+"camera" = "Camera";
+"gallery" = "Gallery";
+"location" = "Location";
+"file" = "File";
+"sticker" = "Sticker";
+"video" = "Video";
+"processing" = "Processing";
+"processed_of_" = "Processed %d/%d";
+"exported_of_" = "Exported %d/%d";
+
+"messageSendFailed" = "Message send failed. Tap to retry";
+
+"resendMessage" = "Message failed to send";
+"resend" = "Resend";
+"dismiss" = "Dismiss";

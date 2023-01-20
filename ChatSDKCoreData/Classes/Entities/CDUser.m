@@ -20,8 +20,19 @@
 }
 
 -(NSString *) name {
-    return [self.meta metaStringForKey:bUserNameKey];
+    NSString * name = [self.meta metaStringForKey:bNickname];
+    if (!name || !name.length) {
+        name = [self.meta metaStringForKey:bUserNameKey];
+    }
+    if (!name || !name.length) {
+        name = [self.meta metaStringForKey:bUserPhoneKey];
+    }
+    return name;
 }
+
+//-(NSString *) displayName {
+//    return self.name && self.name.length : self.name ? @"???";
+//}
 
 -(void) setEmail:(NSString *)email {
     [self setMetaValue:email forKey:bUserEmailKey];
@@ -41,22 +52,7 @@
 
 -(NSString *) pushChannel {
     NSString * channel = self.entityID;
-    channel = [channel stringByReplacingOccurrencesOfString:@"." withString:@"1"];
-    channel = [channel stringByReplacingOccurrencesOfString:@"%2E" withString:@"1"];
-    channel = [channel stringByReplacingOccurrencesOfString:@"@" withString:@"2"];
-    channel = [channel stringByReplacingOccurrencesOfString:@"%40" withString:@"2"];
-    channel = [channel stringByReplacingOccurrencesOfString:@":" withString:@"3"];
-    channel = [channel stringByReplacingOccurrencesOfString:@"%3A" withString:@"3"];
-    return channel;
-}
-
--(CDUserAccount *) accountWithType: (bAccountType) type {
-    for (CDUserAccount * account in self.linkedAccounts) {
-        if (account.type.intValue == type) {
-            return account;
-        }
-    }
-    return Nil;
+    return [BCoreUtilities md5: channel].lowercaseString;
 }
 
 -(void) updateMeta: (NSDictionary *) dict {
@@ -69,10 +65,6 @@
 -(void) setMetaValue: (id) value forKey: (NSString *) key {
     [self updateMeta:@{key: [NSString safe: value]}];
 }
-
-//-(void) addContact: (id<PUser>) user {
-//    [self addConnection:user withType:bUserConnectionTypeContact];
-//}
 
 // TODO: Do we need this?
 -(NSArray *) contactsWithType: (bUserConnectionType) type {
@@ -121,10 +113,11 @@
 }
 
 -(RXPromise *) updateAvatarFromURL {
+
     // If there's no image set on temporarily
-    if(!self.image) {
-        [self setImage: UIImagePNGRepresentation(self.defaultImage)];
-    }
+//    if(!self.image) {
+//        [self setImage: UIImagePNGRepresentation(self.defaultImage)];
+//    }
 
     // Then try to load the image from the URL
     NSString * imageURL = self.imageURL;
@@ -158,10 +151,6 @@
     return self;
 }
 
-+(NSString *) firebaseUIDFromFacebookID: (NSString *) fid {
-    return [@"facebook:" stringByAppendingString:fid];
-}
-
 -(void) setAvailability: (NSString *) availability {
     [self setMetaValue:availability forKey:bUserAvailabilityKey];
 }
@@ -172,19 +161,22 @@
 
 -(void) setStatusText: (NSString *) statusText {
     [self setMetaValue:statusText forKey:bUserStatusTextKey];
-//    [self setStatusValue:statusText forKey:bUserStatusTextKey];
 }
 
 -(NSString *) statusText {
     return [self.meta valueForKey:bUserStatusTextKey];
-//    return self.getStatusDictionary[bUserStatusTextKey];
 }
 
 -(UIImage *) imageAsImage {
     if (self.image) {
-        return [[UIImage imageWithData:self.image] resizedImage:bProfilePictureSize interpolationQuality:kCGInterpolationHigh];
+        UIImage * image = [UIImage imageWithData:self.image];
+        if (image.size.height > bProfilePictureSize.height && image.size.width > bProfilePictureSize.width) {
+            return [[UIImage imageWithData:self.image] resizedImage:bProfilePictureSize interpolationQuality:kCGInterpolationHigh];
+        } else {
+            return image;
+        }
     }
-    return Nil;
+    return nil;
 }
 
 -(NSString *) imageURL {
@@ -193,11 +185,7 @@
 
 -(void) setImageURL: (NSString *) url {
     [self updateMeta:@{bUserImageURLKey: url}];
-}
-
-// TODO: Remove UI dependency on CoreData
--(UIImage *) defaultImage {
-    return [Icons getWithName:Icons.defaultProfile];
+    [self updateMeta:@{bImageURL: url}];
 }
 
 -(BOOL) isMe {

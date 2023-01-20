@@ -13,12 +13,10 @@
 
 @protocol PStickerMessageHandler <NSObject>
 
--(RXPromise *) sendMessageWithSticker: (NSString *) stickerName withThreadEntityID: (NSString *) threadID;
--(Class) cellClass;
+-(RXPromise *) sendMessageWithSticker: (NSString *) stickerName url: (NSString *) url threadEntityID: (NSString *) threadID;
 
--(NSString *) stickerPlistName;
--(NSBundle *) stickerBundle;
--(void) setStickerPlistName: (NSString *) name withBundle: (NSBundle *) bundle;
+-(Class) cellClass;
+-(UIImage *) imageForName: (NSString *) name;
 
 @end
 

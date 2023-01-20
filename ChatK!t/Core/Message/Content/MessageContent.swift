@@ -7,12 +7,23 @@
 
 import Foundation
 
-@objc public protocol MessageContent {
- 
-    @objc func view() -> UIView
-    @objc func bind(message: Message)
-    @objc func showBubble() -> Bool
-    @objc func bubbleCornerRadius() -> CGFloat
+public protocol MessageContent : AnyObject {
+    func view() -> UIView
+    func bind(_ message: AbstractMessage, model: MessagesModel)
+    func showBubble() -> Bool
+    func bubbleCornerRadius() -> CGFloat
+}
 
+@objc public protocol DownloadableContent : AnyObject {
+    @objc optional func setDownloadProgress(_ progress: Float, total: Float)
+    @objc optional func downloadFinished(_ url: URL?, error: Error?)
+    @objc optional func downloadPaused()
+    @objc optional func downloadStarted()
+}
+
+@objc public protocol UploadableContent : AnyObject {
+    @objc optional func setUploadProgress(_ progress: Float, total: Float)
+    @objc optional func uploadFinished(_ url: URL?, error: Error?)
+    @objc optional func uploadStarted()
 }
 

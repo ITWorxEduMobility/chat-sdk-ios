@@ -15,28 +15,13 @@
 
 -(instancetype) init {
     if ((self = [super init])) {
-        __weak __typeof__(self) weakSelf = self;
-        [BChatSDK.hook addHook:[BHook hook:^(NSDictionary * data) {
-            // Resets the view which the tab bar loads on
-            __typeof__(self) strongSelf = weakSelf;
-            strongSelf->_currentUser = Nil;
-        }] withName:bHookDidLogout];
     }
     return self;
 }
 
-
-
-
-
 -(void) save {
     [BChatSDK.db save];
 }
-
--(void) saveToStore {
-    [BChatSDK.db saveToStore];
-}
-
 
 -(id<PUser>) userForEntityID: (NSString *) entityID {
     // Get the user and make sure it's updated
@@ -47,32 +32,19 @@
  * @brief Update the user on the server
  */
 -(RXPromise *) pushUser {
+    return [self pushUser:NO];
+}
+
+-(RXPromise *) pushUser: (BOOL) uploadAvatar {
     assert(NO);
 }
+
 
 /**
  * @brief Return the current user data
  */
 -(id<PUser>) currentUserModel {
-    NSString * currentUserID = BChatSDK.auth.currentUserEntityID;
-    if (!_currentUser || ![_currentUserEntityID isEqual:currentUserID]) {
-        _currentUser = [BChatSDK.db fetchEntityWithID:currentUserID withType:bUserEntity];
-        _currentUserEntityID = currentUserID;
-    }
-    return _currentUser;
-}
-
--(RXPromise *) currentUserModelAsync {
-    NSString * currentUserID = BChatSDK.auth.currentUserEntityID;
-    if (!_currentUser || ![_currentUserEntityID isEqual:currentUserID]) {
-        return [BChatSDK.db performOnMain:^id {
-            _currentUser = [BChatSDK.db fetchEntityWithID:currentUserID withType:bUserEntity];
-            _currentUserEntityID = currentUserID;
-            return _currentUser;
-        }];
-    } else {
-        return [RXPromise resolveWithResult:_currentUser];
-    }
+    return BChatSDK.auth.currentUser;
 }
 
 // TODO: Consider removing / refactoring this
@@ -117,5 +89,31 @@
         BChatSDK.currentUser.online = @NO;
     }
 }
+
+-(bConnectionStatus) connectionStatus {
+    if (BChatSDK.connectivity) {
+        return BChatSDK.connectivity.isConnected ? bConnectionStatusConnected : bConnectionStatusDisconnected;
+    }
+    return bConnectionStatusConnected;
+}
+
+-(NSDate *) now {
+    return [NSDate date];
+}
+
+-(NSArray<PUser> *) allKnownUsers {
+    NSMutableSet * users = [NSMutableSet new];
+    for(id<PUser> user in BChatSDK.contact.contacts) {
+        [users addObject:user];
+    }
+    for(id<PThread> thread in [BChatSDK.thread threadsWithType:bThreadFilterAll]) {
+        for (id<PUser> user in thread.users) {
+            [users addObject:user];
+        }
+    }
+    return users.allObjects;
+}
+
+
 
 @end

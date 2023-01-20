@@ -9,13 +9,14 @@
 
 #import <ChatSDK/Core.h>
 #import <Foundation/Foundation.h>
+#import <ChatSDK/ChatSDK-Swift.h>
 
 @implementation BAbstractThreadHandler
 
 -(RXPromise *) sendMessageWithText:(NSString *)text withThreadEntityID:(NSString *)threadID withMetaData: (NSDictionary *)meta {
     
     // Set the URLs for the images and save it in CoreData
-    [BChatSDK.db beginUndoGroup];
+//    [BChatSDK.db beginUndoGroup];
     
     id<PMessage> message = [[[[BMessageBuilder textMessage:text] meta:meta] thread:threadID] build];
     return [self sendMessage:message];
@@ -58,24 +59,29 @@
 -(NSArray *) threadsWithType:(bThreadType)type includeDeleted: (BOOL) includeDeleted includeEmpty: (BOOL) includeEmpty {
     
     NSMutableArray * threads = [NSMutableArray new];
-    NSArray * allThreads = type & bThreadFilterPrivate ? BChatSDK.currentUser.threads : [BChatSDK.db fetchEntitiesWithName:bThreadEntity];
-    
-    for(id<PThread> thread in allThreads) {
-        if(thread.type.intValue & bThreadFilterPrivate && thread.type.intValue & type) {
-            if(thread.type.intValue & type && (!thread.deletedDate || includeDeleted) && (thread.hasMessages || includeEmpty)) {
+//    NSArray * allThreads = type & bThreadFilterPrivate ? BChatSDK.currentUser.threads : [BChatSDK.db fetchEntitiesWithName:bThreadEntity];
+    NSArray * allThreads = [BChatSDK.db threadsWithType:type];
+
+    if (type & bThreadFilterPrivate) {
+        for(id<PThread> thread in allThreads) {
+            if((!thread.deletedDate || includeDeleted) && (thread.hasMessages || includeEmpty)) {
                 [threads addObject:thread];
             }
         }
-        else if (thread.type.intValue & bThreadFilterPublic && thread.type.intValue & type) {
-            if (BChatSDK.config.publicChatRoomLifetimeMinutes == 0) {
-                [threads addObject:thread];
-            } else {
-                NSDate * now = [NSDate date];
-                NSTimeInterval interval = [now timeIntervalSinceDate:thread.creationDate];
-                if (interval < BChatSDK.config.publicChatRoomLifetimeMinutes * 60 && (!thread.deletedDate || includeDeleted) && (thread.hasMessages || includeEmpty)) {
+    }
+    if (type & bThreadFilterPublic) {
+        for(id<PThread> thread in allThreads) {
+            if ((!thread.deletedDate || includeDeleted) && (thread.hasMessages || includeEmpty)) {
+                if (BChatSDK.config.publicChatRoomLifetimeMinutes == 0) {
                     [threads addObject:thread];
                 } else {
-                    [thread markRead];
+                    NSDate * now = [NSDate date];
+                    NSTimeInterval interval = [now timeIntervalSinceDate:thread.creationDate];
+                    if (interval < BChatSDK.config.publicChatRoomLifetimeMinutes * 60) {
+                        [threads addObject:thread];
+                    } else {
+                        [thread markRead];
+                    }
                 }
             }
         }
@@ -94,7 +100,7 @@
 
 -(void) sendLocalSystemMessageWithText:(NSString *)text type: (bSystemMessageType) type withThreadEntityID:(NSString *)threadID {
     id<PMessage> message = [[[BMessageBuilder systemMessage:text type:type] thread:threadID] build];
-    [BHookNotification notificationMessageDidSend: message];
+    [BHookNotification notificationMessageReceived:message];
 }
 
 /**
@@ -105,6 +111,7 @@
 -(RXPromise *) createThreadWithUsers: (NSArray *) users
                                 name: (NSString *) name
                                 type: (bThreadType) type
+                            entityID: (NSString *) entityID
                          forceCreate: (BOOL) force
                        threadCreated: (void(^)(NSError * error, id<PThread> thread)) threadCreated {
     assert(NO);
@@ -116,11 +123,12 @@
                        threadCreated: (void(^)(NSError * error, id<PThread> thread)) threadCreated {
     return [self createThreadWithUsers:users
                                   name:name
+                              imageURL: nil
                                   type:bThreadTypeNone
+                              entityID:nil
                            forceCreate:force
                          threadCreated:threadCreated];
 }
-
 
 -(RXPromise *) createThreadWithUsers: (NSArray *) users
                                 name: (NSString *) name
@@ -129,6 +137,23 @@
                                   name:name
                            forceCreate:NO
                          threadCreated:threadCreated];
+
+}
+
+-(RXPromise *) createThreadWithUsers: (NSArray *) users
+                                name: (NSString *) name
+                               imageURL: (NSString *) imageURL
+                       threadCreated: (void(^)(NSError * error, id<PThread> thread)) threadCreated {
+
+    return [self createThreadWithUsers:users
+                                  name:name
+                              imageURL:imageURL
+                                  type:bThreadTypeNone
+                              entityID:nil
+                           forceCreate:NO
+                         threadCreated:threadCreated];
+
+
 }
 
 -(RXPromise *) createThreadWithUsers: (NSArray *) users
@@ -146,8 +171,22 @@
 /**
  * @brief Remove users from a thread
  */
--(RXPromise *) removeUsers: (NSArray *) users fromThread: (id<PThread>) threadModel {
+
+-(RXPromise *) removeUsers:(NSArray<NSString *> *)userEntityIDs fromThread:(NSString *) threadEntityID {
     assert(NO);
+}
+
+-(BOOL) canRemoveUser: (NSString *) userEntityID fromThread: (NSString *) threadEntityID {
+    return NO;
+}
+
+-(BOOL) canRemoveUsers: (NSArray<NSString *> *) userEntityIDs fromThread: (NSString *) threadEntityID {
+    for (NSString * entityID in userEntityIDs) {
+        if (![self canRemoveUser:entityID fromThread:threadEntityID]) {
+            return false;
+        }
+    }
+    return true;
 }
 
 /**
@@ -176,7 +215,7 @@
 
 -(RXPromise *) leaveThread: (id<PThread>) thread {
     id<PUser> user = BChatSDK.currentUser;
-    return [self removeUsers:@[user] fromThread:thread];
+    return [self removeUsers:@[user.entityID] fromThread:thread.entityID];
 }
 
 -(RXPromise *) joinThread: (id<PThread>) thread {
@@ -283,26 +322,142 @@
     return [RXPromise resolveWithResult:Nil];
 }
 
+-(RXPromise *) pushThreadMeta: (NSString *) threadEntityID {
+    return [RXPromise resolveWithResult:nil];
+}
+
+-(BOOL) canMuteThreads {
+    return false;
+}
+
+-(BOOL) canEditThread: (NSString *) threadEntityID {
+    return false;
+}
+
 -(RXPromise *) replyToMessage: (id<PMessage>) message withThreadID: (NSString *) threadEntityID reply: (NSString *) reply {
     
-    BMessageBuilder * builder = [[BMessageBuilder textMessage: message.isReply ? message.reply : @""] thread:threadEntityID];
+//    [BChatSDK.db beginUndoGroup];
+
+    BMessageBuilder * builder = [[BMessageBuilder textMessage: @""] thread:threadEntityID];
     
-    if (!message.isReply) {
-        NSMutableDictionary * meta = [NSMutableDictionary dictionaryWithDictionary:message.meta];
-        meta[bId] = message.entityID;
-        meta[bType] = message.type;
-        [builder meta: meta];
+//    if (!message.isReply) {
+    NSMutableDictionary * meta = [NSMutableDictionary dictionaryWithDictionary:message.meta];
+    meta[bPushSent] = nil;
+    meta[bId] = message.entityID;
+    meta[bType] = message.type;
+    meta[bFrom] = message.user.entityID;
+    
+    if (message.type.intValue == bMessageTypeLocation) {
+        float longitude = [message.meta[bMessageLongitude] floatValue];
+        float latitude = [message.meta[bMessageLatitude] floatValue];
+        int size = BChatSDK.config.replyThumbnailSize;
+        
+        NSString * url = [GoogleUtils getMapImageURLWithLatitude:latitude longitude:longitude width:size height:size];
+        if (url) {
+            meta[bImageURL] = url;
+        }
     }
-    
+
+    [builder meta: meta];
+//    }
+
     id<PMessage> newMessage = [builder build];
+
     [newMessage setMetaValue:reply forKey:bReplyKey];
-    
+
+    if (message.isReply) {
+        [newMessage setText:message.reply];
+    } else {
+        [newMessage setText:message.text];
+    }
+
     return [self sendMessage:newMessage];
 }
 
 -(RXPromise *) forwardMessage: (id<PMessage>) message toThreadWithID: (NSString *) threadEntityID {
+//    [BChatSDK.db beginUndoGroup];
     id<PMessage> newMessage = [[[[BMessageBuilder withType:message.type.intValue] meta:message.meta] thread:threadEntityID] build];
     return [self sendMessage:newMessage];
+}
+
+-(void) reconnect {
+    
+}
+
+-(BOOL) rolesEnabled: (NSString *) threadEntityID {
+    return false;
+}
+
+-(BOOL) canChangeRole: (NSString *) threadEntityID forUser: (NSString *) userEntityID {
+    return false;
+}
+
+-(nonnull NSString *) role: (NSString *) threadEntityID forUser: (NSString *) userEntityID {
+    return @"";
+}
+
+-(nonnull RXPromise *) setRole: (NSString *) role forThread: (NSString *) threadEntityID forUser: (NSString *) userEntityID {
+    return [RXPromise rejectWithReason:nil];
+}
+
+-(nonnull NSArray<NSString *> *) availableRoles: (NSString *) threadEntityID forUser: (NSString *) userEntityID {
+    return @[];
+}
+
+-(BOOL) canChangeVoice: (NSString *) threadEntityID forUser: (NSString *) userEntityID {
+    return false;
+}
+
+-(BOOL) hasVoice: (NSString *) threadEntityID forUser: (NSString *) userEntityID {
+    return true;
+}
+
+-(nonnull RXPromise *) grantVoice: (NSString *) threadEntityID forUser: (NSString *) userEntityID {
+    return [RXPromise rejectWithReason:nil];
+}
+
+-(nonnull RXPromise *) revokeVoice: (NSString *) threadEntityID forUser: (NSString *) userEntityID {
+    return [RXPromise rejectWithReason:nil];
+}
+
+-(BOOL) canChangeModerator: (NSString *) threadEntityID forUser: (NSString *) userEntityID {
+    return false;
+}
+
+-(BOOL) isModerator: (NSString *) threadEntityID forUser: (NSString *) userEntityID {
+    return false;
+}
+
+-(nonnull RXPromise *) grantModerator: (NSString *) threadEntityID forUser: (NSString *) userEntityID {
+    return [RXPromise rejectWithReason:nil];
+}
+
+-(nonnull RXPromise *) revokeModerator: (NSString *) threadEntityID forUser: (NSString *) userEntityID {
+    return [RXPromise rejectWithReason:nil];
+}
+
+-(BOOL) canDelete: (NSString *) threadEntityID {
+    return false;
+}
+
+-(BOOL) canDestroyThread: (nonnull NSString *) threadEntityID {
+    return false;
+}
+
+-(BOOL) canLeaveThread: (id<PThread>) thread {
+    return [thread typeIs:bThreadFilterGroup];
+}
+
+-(BOOL) canJoinThread: (id<PThread>) thread {
+    return NO;
+}
+
+-(RXPromise *) refreshRoles: (NSString *) threadEntityID {
+    return [RXPromise resolveWithResult:nil];
+}
+
+-(BOOL) threadImagesSupported {
+    return NO;
 }
 
 @end

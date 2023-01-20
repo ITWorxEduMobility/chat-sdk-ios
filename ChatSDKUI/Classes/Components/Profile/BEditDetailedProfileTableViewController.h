@@ -27,6 +27,7 @@
 }
 
 @property (nonatomic, readwrite) BDetailedProfileTableViewController * profileViewController;
+@property (nonatomic, readwrite) UIImagePickerController * imagePickerController;
 
 @property (weak, nonatomic) IBOutlet UITextView *statusTextView;
 @property (weak, nonatomic) IBOutlet UITextField *nameTextField;
@@ -44,5 +45,8 @@
 @property (weak, nonatomic) IBOutlet UITableViewCell *localityCell;
 @property (weak, nonatomic) IBOutlet UITableViewCell *phoneCell;
 @property (weak, nonatomic) IBOutlet UITableViewCell *emailCell;
+
+- (IBAction)profilePictureButtonPressed:(UIButton *)sender;
+-(void) setProfileImage: (UIImage *) image;
 
 @end

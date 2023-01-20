@@ -10,11 +10,14 @@
 
 #import <ChatSDK/Core.h>
 #import <ChatSDK/UI.h>
+#import <ChatSDK/ChatSDK-Swift.h>
 
 #define bStatusSection 1
 #define bDateFormat @"dd/MM/yyyy"
 
-@interface BDetailedEditProfileTableViewController ()
+@interface BDetailedEditProfileTableViewController () {
+    BOOL uploadAvatar;
+}
 
 @end
 
@@ -28,6 +31,7 @@
 @synthesize availabilityButton;
 @synthesize availabilityCell;
 @synthesize profilePictureButton;
+@synthesize imagePickerController = _imagePicker;
 
 - (void)viewDidLoad {
     [super viewDidLoad];
@@ -58,6 +62,8 @@
     phoneTextField.text = user.phoneNumber;
     emailTextField.text = user.email;
     
+    statusTextView.textColor = [Colors getWithName:Colors.mediumGray];
+    
     // Availability
     _availabilityOptions = [BAvailabilityState options];
     
@@ -85,6 +91,7 @@
     
     [profilePictureButton loadAvatarForUser:user forControlState:UIControlStateNormal];
     profilePictureButton.layer.cornerRadius = 50;
+    profilePictureButton.imageView.contentMode = UIViewContentModeScaleAspectFill;
     
     // Hide the picker cells - they are displayed when their button is pressed
     [self cell:availabilityCell setHidden:YES];
@@ -105,39 +112,47 @@
 
 - (IBAction)profilePictureButtonPressed:(UIButton *)sender {
     
+    __weak __typeof(self) weakSelf = self;
+    
+    PhotoSourceActionSheet * sheet = [PhotoSourceActionSheet new];
+    
     if (!_imagePicker) {
         _imagePicker = [[UIImagePickerController alloc] init];
         _imagePicker.delegate = self;
         _imagePicker.allowsEditing = YES;
     }
+        
+    [self presentViewController:[sheet getOnPick:^(UIImagePickerControllerSourceType type) {
+        weakSelf.imagePickerController.sourceType = type;
+        [weakSelf presentViewController:weakSelf.imagePickerController animated:YES completion:Nil];
+    } sourceView:sender] animated:YES completion:nil];
     
-    _imagePicker.sourceType = UIImagePickerControllerSourceTypePhotoLibrary;
-    
-    [self presentViewController:_imagePicker animated:YES completion:Nil];
 }
 
 - (void)imagePickerController:(UIImagePickerController *)picker didFinishPickingMediaWithInfo:(NSDictionary *)info {
     _profileImage = [info objectForKey:UIImagePickerControllerEditedImage];
     
-    // Now reduce the image to 200x200 for the profile picture
-    _profileImage = [_profileImage resizedImage:bProfilePictureSize interpolationQuality:kCGInterpolationHigh];
+    // Get the aspect ratio
+    CGSize size = _profileImage.size;
+    float minDimension = MIN(size.width, size.height);
+    
+    // Crop to a square
+    _profileImage = [UIImage imageByCroppingImage:_profileImage toSize:CGSizeMake(minDimension, minDimension)];
+    _profileImage = [_profileImage resizeImageToSize:bProfilePictureSize];
+    
+//    float ar = size.width / size.height;
+//    if (ar > 0) {
+//        size.width = bProfilePictureSize.width;
+//        size.height = bProfilePictureSize.width / ar;
+//    } else {
+//        size.width = bProfilePictureSize.height * ar;
+//        size.height = bProfilePictureSize.height;
+//    }
+//
+//    // Now reduce the image to 200x200 for the profile picture
+//    _profileImage = [_profileImage resizeImageToSize:size];
     
     [profilePictureButton setImage:_profileImage forState:UIControlStateNormal];
-    
-    [MBProgressHUD showHUDAddedTo:self.view animated:YES];
-    
-    // Upload the image
-    if(BChatSDK.upload.shouldUploadAvatar) {
-        [BChatSDK.upload uploadImage:_profileImage].thenOnMain(^id(NSDictionary * urls) {
-
-            // Set the meta data
-            [BChatSDK.currentUser updateMeta:@{bUserImageURLKey: urls[bImagePath]}];
-            
-            [MBProgressHUD hideHUDForView:self.view animated: YES];
-            
-            return urls;
-        }, Nil);
-    }
     
     [picker dismissViewControllerAnimated:YES completion:Nil];
 }
@@ -227,7 +242,7 @@
 //    hud.labelText = [NSBundle t: bSaving];
 //    self.view.userInteractionEnabled = NO;
     
-    [BChatSDK.core pushUser].thenOnMain(^id(id success) {
+    [BChatSDK.core pushUser: _profileImage != nil].thenOnMain(^id(id success) {
 //        [MBProgressHUD hideHUDForView: self.view animated:YES];
 //        [self dismissViewControllerAnimated:YES completion:Nil];
 //        self.view.userInteractionEnabled = YES;
@@ -255,11 +270,10 @@
     [user setEmail:emailTextField.text];
     [user setAvailability:[_availabilityOptions[[_availabilityPicker selectedRowInComponent:0]] lastObject]];
     if (_profileImage) {
-        [user setImage:UIImageJPEGRepresentation(_profileImage, 0.5)];
+        [user setImage:UIImagePNGRepresentation(_profileImage)];
     }
 
-    [[NSNotificationCenter defaultCenter] postNotificationName:bNotificationUserUpdated object:Nil userInfo:@{bNotificationUserUpdated_PUser: user}];
-
+    [BHookNotification notificationUserUpdated:user];
 }
 
 - (BOOL)textFieldShouldReturn:(UITextField *)textField {

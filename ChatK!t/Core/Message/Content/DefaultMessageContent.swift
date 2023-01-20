@@ -7,31 +7,72 @@
 
 import Foundation
 
-@objc public class DefaultMessageContent: NSObject, MessageContent {
-
-    public func view() -> UIView {
-        assert(false, "DefaultMessageContent view() method must be overridden")
-        return UIView()
-    }
+open class DefaultMessageContent: MessageContent {
     
-    public func bind(message: Message) {
+    public required init() {
         
     }
     
-//    @objc public func showBubble() -> Bool {
-//        return true
-//    }
-//    @objc public func bubbleCornerRadius() -> Float {
-//        return 5.0
-//    }
+    open func view() -> UIView {
+        preconditionFailure("This method must be overridden")
+    }
+        
+    open func bind(_ message: AbstractMessage, model: MessagesModel) {
+        message.setContent(self)
+    }
     
 }
 
-@objc extension DefaultMessageContent {
-    @objc public func showBubble() -> Bool {
+extension DefaultMessageContent {
+    @objc open func showBubble() -> Bool {
         return true
     }
-    @objc public func bubbleCornerRadius() -> CGFloat {
-        return 10.0
+    @objc open func bubbleCornerRadius() -> CGFloat {
+        return ChatKit.config().bubbleCornerRadius
     }
+}
+
+open class DefaultDownloadableMessageContent: DefaultMessageContent, DownloadableContent, UploadableContent {
+    
+    open override func bind(_ message: AbstractMessage, model: MessagesModel) {
+        super.bind(message, model: model)
+        progressViewHelper()?.setTick(color: model.bubbleColor(message))
+        
+        if let message = message as? DownloadableMessage {
+            progressViewHelper()?.setDownloaded(message.isDownloaded())
+        }
+    }
+        
+    open func setDownloadProgress(_ progress: Float, total: Float) {
+        progressViewHelper()?.setDownloadProgress(progress, total: total)
+    }
+
+    open func downloadFinished(_ url: URL?, error: Error?) {
+        progressViewHelper()?.downloadFinished(url, error: error)
+    }
+
+    open func downloadPaused() {
+        progressViewHelper()?.downloadPaused()
+    }
+
+    open func downloadStarted() {
+        progressViewHelper()?.downloadStarted()
+    }
+    
+    open func setUploadProgress(_ progress: Float, total: Float) {
+        progressViewHelper()?.setUploadProgress(progress, total: total)
+    }
+
+    open func uploadFinished(_ url: URL?, error: Error?) {
+        progressViewHelper()?.uploadFinished(url, error: error)
+    }
+
+    open func uploadStarted() {
+        progressViewHelper()?.uploadStarted()
+    }
+
+    open func progressViewHelper() -> MessageProgressHelper? {
+        preconditionFailure("This method must be overridden")
+    }
+
 }

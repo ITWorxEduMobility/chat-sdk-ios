@@ -35,10 +35,11 @@ XcodeXMPP/
 XcodeXMPPSwift/
 XcodeCalvin/
 XcodeXMPPSwift/
+XcodeModuleGenerator/
 FirebaseUI-iOS/
 firebase-ios-sdk/
 XcodeTestAll/
-ChatSDKDemo/
+# ChatSDKDemo/
 INDX420/
 Old/
 XcodeStefan/
@@ -54,6 +55,9 @@ Archived/
 XcodeModules/
 XcodeXMPPModules/
 versions/
+Xcode/
+XcodeModulesExp/
+DemoSwift2/
 
 # Ignore these in subfolders, but track in root of repo
 ChatSDKFirebase/
@@ -62,3 +66,6 @@ ChatSDKModules/
 !/ChatSDKFirebase/
 !/ChatSDKFirebaseAdapter/
 !/ChatSDKModules/
+
+# ChatSDKPro/
+# ChatSDKPro.podspec

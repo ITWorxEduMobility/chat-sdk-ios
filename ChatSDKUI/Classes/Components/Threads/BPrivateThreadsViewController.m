@@ -29,8 +29,11 @@
 }
 
 - (void)viewWillAppear:(BOOL)animated {
-    [super viewWillAppear:YES];
-    
+    [super viewWillAppear:animated];
+    [self doViewWillAppear];
+}
+
+-(void) doViewWillAppear {
     _editButton = [[UIBarButtonItem alloc] initWithTitle:[NSBundle t:bEdit]
                                                    style:UIBarButtonItemStylePlain
                                                   target:self
@@ -47,6 +50,7 @@
     self.navigationItem.rightBarButtonItem =  [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemAdd
                                                                                             target:self
                                                                                             action:@selector(createThread)];
+    
 }
 
 -(void) createThread {
@@ -57,22 +61,39 @@
 
     __weak __typeof__(self) weakSelf = self;
 
-    UINavigationController * nav = [BChatSDK.ui friendsNavigationControllerWithUsersToExclude:@[] onComplete:^(NSArray * users, NSString * groupName){
+    UINavigationController * nav = [BChatSDK.ui friendsNavigationControllerWithUsersToExclude:@[] onComplete:^(NSArray<PUser> * users, NSString * groupName, UIImage * image){
         __typeof__(self) strongSelf = weakSelf;
-        
-        MBProgressHUD * hud = [MBProgressHUD showHUDAddedTo:weakSelf.view animated:YES];
+
+        MBProgressHUD * hud = [MBProgressHUD showHUDAddedTo:strongSelf.view animated:YES];
         hud.label.text = [NSBundle t:bCreatingThread];
-        
-        // Create group with group name
-        [BChatSDK.thread createThreadWithUsers:users name:groupName threadCreated:^(NSError *error, id<PThread> thread) {
+
+        void(^onCreate)(NSError *error, id<PThread> thread) = ^(NSError *error, id<PThread> thread) {
             if (!error) {
                 [strongSelf pushChatViewControllerWithThread:thread];
             }
             else {
-                [UIView alertWithTitle:[NSBundle t:bErrorTitle] withMessage:[NSBundle t:bThreadCreationError]];
+                [strongSelf alertWithTitle:[NSBundle t:bErrorTitle] withMessage:[NSBundle t:bThreadCreationError]];
             }
             [MBProgressHUD hideHUDForView:strongSelf.view animated:YES];
-        }];
+        };
+        
+        if (image && BChatSDK.config.groupImagesEnabled) {
+            [BChatSDK.upload uploadImage:image].thenOnMain(^id(id success) {
+                // Create group with group name
+                NSString * url = success[bImagePath];
+                
+                [BChatSDK.thread createThreadWithUsers:users name:groupName imageURL:url threadCreated:onCreate];
+
+                return success;
+            }, ^id(NSError * error) {
+                [strongSelf alertWithTitle:[NSBundle t:bErrorTitle] withMessage:error.localizedDescription];
+                [MBProgressHUD hideHUDForView:strongSelf.view animated:YES];
+                return error;
+            });
+        } else {
+            // Create group with group name
+            [BChatSDK.thread createThreadWithUsers:users name:groupName threadCreated:onCreate];
+        }
         
     }];
     
@@ -92,10 +113,23 @@
     return YES;
 }
 
--(void) reloadData {
+-(void) loadThreads {
     [_threads removeAllObjects];
     [_threads addObjectsFromArray:[BChatSDK.thread threadsWithType:bThreadFilterPrivateThread includeDeleted:NO]];
-    [super reloadData];
+}
+
+-(void) updateLocalNotificationHandler {
+    [BChatSDK.ui setLocalNotificationHandler:^(id<PThread> thread) {
+        BOOL result = !(thread.type.intValue & bThreadFilterPrivate);
+        return result;
+    }];
+}
+
+-(void) updateBadge {
+    [BChatSDK.db privateThreadUnreadMessageCount].thenOnMain(^id(NSNumber * result) {
+        self.tabBarItem.badgeValue = result.intValue > 0 ? result.stringValue : nil;
+        return nil;
+    }, nil);
 }
 
 @end

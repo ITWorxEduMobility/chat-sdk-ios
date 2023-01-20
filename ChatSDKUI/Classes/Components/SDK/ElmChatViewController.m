@@ -29,13 +29,21 @@
 @synthesize tableView;
 @synthesize delegate;
 @synthesize sendBarView = _sendBarView;
-@synthesize titleLabel = _titleLabel;
+//@synthesize titleLabel = _titleLabel;
 @synthesize messageManager = _messageManager;
+@synthesize headerView = _headerView;
 
--(instancetype) initWithDelegate: (id<ElmChatViewDelegate>) delegate_
+-(instancetype) initWithDelegate: (id<ElmChatViewDelegate>) delegate_  nibName:(nullable NSString *)nibNameOrNil bundle:(nullable NSBundle *)nibBundleOrNil
 {
     self.delegate = delegate_;
-    self = [super initWithNibName:@"BChatViewController" bundle:[NSBundle uiBundle]];
+    if (!nibNameOrNil) {
+        nibNameOrNil = @"BChatViewController";
+    }
+    if(!nibBundleOrNil) {
+        nibBundleOrNil = [NSBundle uiBundle];
+    }
+    
+    self = [super initWithNibName: nibNameOrNil bundle:nibBundleOrNil];
     if (self) {
         
         _messageManager = [BMessageManager new];
@@ -49,14 +57,9 @@
         [tableView addGestureRecognizer: _longPressRecognizer];
         
         // It should only be enabled when the keyboard is being displayed
-//        _tapRecognizer.enabled = NO;
+        _tapRecognizer.enabled = NO;
         
-        // When a user taps the title bar we want to know to show the options screen
-        if (BChatSDK.config.userChatInfoEnabled) {
-            UITapGestureRecognizer * titleTapRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(navigationBarTapped)];
-            [self.navigationItem.titleView addGestureRecognizer:titleTapRecognizer];
-        }
-        
+
         _notificationList = [BNotificationObserverList new];
         
         _lazyReloadManager = [[BLazyReloadManager alloc] initWithTableView:tableView messageManager:_messageManager];
@@ -95,6 +98,19 @@
 
 }
 
+-(void) setReadOnly: (BOOL) readOnly {
+    if (readOnly) {
+        _replyView.keepBottomOffsetTo(_sendBarView).equal = -_sendBarView.frame.size.height;
+        [_sendBarView.superview sendSubviewToBack:_sendBarView];
+        
+    } else {
+        _replyView.keepBottomOffsetTo(_sendBarView).equal = 0;
+        [_sendBarView.superview bringSubviewToFront:_sendBarView];
+    }
+    [_sendBarView setReadOnly:readOnly];
+}
+
+
 -(void) clearSelection {
     [_selectedIndexPaths removeAllObjects];
     [self reloadData];
@@ -112,9 +128,8 @@
     UIPasteboard.generalPasteboard.string = copyText;
     [self.view makeToast:[NSBundle t: bCopiedToClipboard]];
 }
-
 -(void) setupChatToolbar {
-    _chatToolbar = [[ChatToolbar alloc] init];
+    _chatToolbar = [[BChatToolbar alloc] init];
     [self.view addSubview:_chatToolbar];
     
     _chatToolbar.keepTopAlignTo(_sendBarView).equal = 0;
@@ -150,9 +165,8 @@
     };
 
 }
-
 -(void) setupReplyView {
-    _replyView = [[ReplyView alloc] init];
+    _replyView = [[BReplyView alloc] init];
     [self.view addSubview:_replyView];
     
     _replyView.keepRightInset.equal = 0;
@@ -178,31 +192,26 @@
 // 3 - Show's who's typing
 -(void) setupNavigationBar {
     
-    UIView * containerView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 220, 40)];
+    _headerView = [BChatHeaderView new];
+
+    // When a user taps the title bar we want to know to show the options screen
+    if (BChatSDK.config.userChatInfoEnabled) {
+        UITapGestureRecognizer * titleTapRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(navigationBarTapped)];
+        [_headerView addGestureRecognizer:titleTapRecognizer];
+    }
+
+    void(^block)() = ^(NSDictionary * info){
+        self.navigationItem.titleView = _headerView;
+        if ([BChatSDK.core respondsToSelector:@selector(connectionStatus)] && (BChatSDK.core.connectionStatus != bConnectionStatusConnected) && BChatSDK.core.connectionStatus != bConnectionStatusNone) {
+            self.navigationItem.titleView = [BReconnectingView new];
+        }
+    };
     
-    _titleLabel = [[UILabel alloc] init];
+    block(nil);
     
-    _titleLabel.text = [NSBundle t: bThread];
-    _titleLabel.textAlignment = NSTextAlignmentCenter;
-    _titleLabel.font = [UIFont boldSystemFontOfSize:_titleLabel.font.pointSize];
+    BHook * hook = [BHook hookOnMain:block];
+    [BChatSDK.hook addHook:hook withName:bHookServerConnectionStatusUpdated];
     
-    [containerView addSubview:_titleLabel];
-    _titleLabel.keepInsets.equal = 0;
-    _titleLabel.keepBottomInset.equal = 15;
-    
-    _subtitleLabel = [[UILabel alloc] init];
-    _subtitleLabel.textAlignment = NSTextAlignmentCenter;
-    _subtitleLabel.font = [UIFont italicSystemFontOfSize:12.0];
-    _subtitleLabel.textColor = [UIColor lightGrayColor];
-    
-    [containerView addSubview:_subtitleLabel];
-    
-    _subtitleLabel.keepHeight.equal = 15;
-    _subtitleLabel.keepWidth.equal = 200;
-    _subtitleLabel.keepBottomInset.equal = 0;
-    _subtitleLabel.keepHorizontalCenter.equal = 0.5;
-    
-    [self.navigationItem setTitleView:containerView];
 }
 
 // The options handler is responsible for displaying options to the user
@@ -227,17 +236,25 @@
 }
 
 -(void) setTitle: (NSString *) title {
-    _titleLabel.text = title;
+    _headerView.titleLabel.text = title;
 }
 
 -(void) setSubtitle: (NSString *) subtitle {
     _subtitleText = subtitle;
-    _subtitleLabel.text = subtitle;
+    _headerView.subtitleLabel.text = subtitle;
 }
 
 -(void) addMessage: (id<PMessage>) message {
     dispatch_async(dispatch_get_main_queue(), ^{
-        [self.messageManager addMessage: message];
+        NSIndexPath * indexPath = [self.messageManager addMessage: message];
+//        NSIndexPath * previous = [self.messageManager indexPathForPreviousMessage:message];
+//        [tableView beginUpdates];
+//        [tableView insertRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationFade];
+//        if (previous) {
+//            [tableView reloadRowsAtIndexPaths:@[previous] withRowAnimation:UITableViewRowAnimationFade];
+//        }
+//        [tableView endUpdates];
+//        [self scrollToBottomOfTable:YES force:message.senderIsMe];
         [self reloadData:YES animate:YES force:message.senderIsMe];
     });
 }
@@ -253,7 +270,7 @@
 -(void) reloadDataForIndexPath: (NSIndexPath *) indexPath {
     if (indexPath) {
         dispatch_async(dispatch_get_main_queue(), ^{
-            NSLog(@"Reload %@", NSStringFromSelector(_cmd));
+            [BChatSDK.shared.logger log: @"Reload %@", NSStringFromSelector(_cmd)];
             [self.tableView reloadData];
 //            [self.tableView reloadRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationNone];
         });
@@ -262,15 +279,14 @@
 
 -(void) addMessages: (NSArray<id<PMessage>> *) messages {
     dispatch_async(dispatch_get_main_queue(), ^{
-        NSLog(@"Reload %@", NSStringFromSelector(_cmd));
+        [BChatSDK.shared.logger log: @"Reload %@", NSStringFromSelector(_cmd)];
         [self.tableView reloadData];
     });
 }
 
 -(void) removeMessage: (id<PMessage>) message {
-    dispatch_async(dispatch_get_main_queue(), ^{
-        [self.messageManager removeMessage: message];
-    });
+    [self.messageManager removeMessage: message];
+    [self reloadData];
 }
 
 -(void) setMessages: (NSArray<PMessage> *) messages {
@@ -330,7 +346,6 @@
 
     [self setupKeyboardOverlay];
     
-    
 
 }
 
@@ -349,6 +364,13 @@
         [self updateChatToolbar];
     }
 }
+
+//- (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldReceivePress:(UIPress *)press {
+//    if ([gestureRecognizer isEqual:_tapRecognizer]) {
+//        return BChatSDK.config.messageSelectionEnabled || _sendBarView.isFirstResponder;
+//    }
+//    return YES;
+//}
 
 -(void) onTap: (UITapGestureRecognizer *) recognizer {
     if (BChatSDK.config.messageSelectionEnabled && self.selectionModeEnabled) {
@@ -421,7 +443,13 @@
 
 -(void) startTypingWithMessage: (NSString *) message {
     if(message && message.length) {
-        _subtitleLabel.text = message;
+        _headerView.subtitleLabel.text = message;
+        __weak __typeof__(self) weakSelf = self;
+        [NSTimer scheduledTimerWithTimeInterval:5 repeats:NO block:^(NSTimer * timer) {
+            __typeof(self) strongSelf = weakSelf;
+            [timer invalidate];
+            [strongSelf stopTyping];
+        }];
     }
     else {
         [self stopTyping];
@@ -429,7 +457,7 @@
 }
 
 -(void) stopTyping {
-    _subtitleLabel.text = _subtitleText;
+    _headerView.subtitleLabel.text = _subtitleText;
 }
 
 -(void) setTextInputDisabled: (BOOL) disabled {
@@ -445,11 +473,13 @@
     [self setChatState:bChatStateComposing];
     // Each time the user types we reset the timer
     [_typingTimer invalidate];
-    _typingTimer = [NSTimer scheduledTimerWithTimeInterval:bTypingTimeout
-                                                    target:self
-                                                  selector:@selector(userFinishedTyping)
-                                                  userInfo:nil
-                                                   repeats:NO];
+    
+    __weak __typeof(self) weakSelf = self;
+    _typingTimer = [NSTimer scheduledTimerWithTimeInterval:bTypingTimeout repeats:NO block:^(NSTimer * timer) {
+        [timer invalidate];
+        __typeof(self) strongSelf = weakSelf;
+        [strongSelf userFinishedTyping];
+    }];
 }
 
 -(void) viewWillAppear:(BOOL)animated {
@@ -470,9 +500,9 @@
     // scrolls the last bit animated (viewDidAppear)
     [self scrollToBottomOfTable:NO force:YES];
     
-    [self setChatState:bChatStateActive];
+//    [self setChatState:bChatStateActive];
         
-//    [self reloadData];
+    [self reloadData];
 }
 
 -(void) viewDidLayoutSubviews {
@@ -493,14 +523,14 @@
     
     [self removeObservers];
     
-    [self.delegate markRead];
+//    [self.delegate markRead];
     
     _keyboardOverlay.alpha = 0;
     _keyboardOverlay.userInteractionEnabled = NO;
     
     // Typing Indicator
     // When the user leaves then automatically set them not to be typing in the thread
-    [self userFinishedTypingWithState: bChatStateInactive];
+//    [self userFinishedTypingWithState: bChatStateInactive];
 }
 
 #pragma TableView delegates
@@ -524,11 +554,7 @@
 - (UITableViewCell *)tableView:(UITableView *)tableView_ cellForRowAtIndexPath:(NSIndexPath *)indexPath {
     
     id<PElmMessage> message = [self messageForIndexPath:indexPath];
-    
-    if (BChatSDK.encryption) {
-        [BChatSDK.encryption decryptMessage:message];
-    }
-    
+        
     BMessageCell * messageCell;
     
     // We want to check if the message is a premium type but without the libraries added
@@ -563,7 +589,7 @@
         });
     }]];
     
-    [_notificationList add: [BChatSDK.hook addHook:[BHook hook:^(NSDictionary * data) {
+    [_notificationList add: [BChatSDK.hook addHook:[BHook hookOnMain:^(NSDictionary * data) {
         __typeof__(self) strongSelf = weakSelf;
         [strongSelf updateInterfaceForReachabilityStateChange];
     }] withName:bHookInternetConnectivityDidChange]];
@@ -573,6 +599,7 @@
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(keyboardDidShow:) name:UIKeyboardDidShowNotification object:Nil];
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(keyboardWillHide:) name:UIKeyboardWillHideNotification object:Nil];
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(keyboardDidHide:) name:UIKeyboardDidHideNotification object:Nil];
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(keyboardWillChangeFrame:) name:UIKeyboardWillChangeFrameNotification object:Nil];
 }
 
 -(void) removeObservers {
@@ -582,6 +609,7 @@
     [[NSNotificationCenter defaultCenter] removeObserver:self name:UIKeyboardDidShowNotification object:Nil];
     [[NSNotificationCenter defaultCenter] removeObserver:self name:UIKeyboardWillHideNotification object:Nil];
     [[NSNotificationCenter defaultCenter] removeObserver:self name:UIKeyboardDidHideNotification object:Nil];
+    [[NSNotificationCenter defaultCenter] removeObserver:self name:UIKeyboardWillChangeFrameNotification object:Nil];
 
 }
 
@@ -699,7 +727,7 @@
         NSURL * url = [NSURL URLWithString:meta[bMessageFileURL]];
         [BFileCache cacheFileFromURL:url withFileName:meta[bMessageText] andCacheName:cell.message.entityID]
         .thenOnMain(^id(NSURL * cacheUrl) {
-            NSLog(@"Cache URL: %@", [cacheUrl absoluteString]);
+            [BChatSDK.shared.logger log: @"Cache URL: %@", [cacheUrl absoluteString]];
             [cell setMessage:cell.message isSelected:[_selectedIndexPaths containsObject:indexPath]];
             
             [cell hideActivityIndicator];
@@ -707,10 +735,16 @@
             [self presentDocumentInteractionViewControllerWithURL:cacheUrl andName:nil];
             return nil;
         }, ^id(NSError *error) {
-            NSLog(@"Error: %@", error.localizedDescription);
+            [BChatSDK.shared.logger log: @"Error: %@", error.localizedDescription];
             [cell hideActivityIndicator];
             return nil;
         });
+    }
+    
+    if ([cell isKindOfClass:[BTextMessageCell class]]) {
+        NSString * string = cell.message.text;
+        UIPasteboard *pasteboard = [UIPasteboard generalPasteboard];
+        pasteboard.string = string;
     }
 }
 
@@ -724,7 +758,7 @@
         error = [((AVPlayerItem *) object) error];
     }
     if (error) {
-        NSLog(@"%@", error.localizedDescription);
+        [BChatSDK.shared.logger log: @"%@", error.localizedDescription];
     }
 }
 
@@ -789,9 +823,10 @@
     
     id<PElmMessage> message = [self messageForIndexPath:indexPath];
     
+    __weak __typeof(self) weakSelf = self;
     [delegate setMessageFlagged:message isFlagged:message.flagged.intValue].thenOnMain(^id(id success) {
         // Reload the tableView and not [self reloadData] so we don't go to the bottom of the tableView
-        [self reloadDataForMessage:message];
+        [weakSelf reloadDataForMessage:message];
         return Nil;
     }, Nil);
     
@@ -799,7 +834,7 @@
 }
 
 - (BOOL)tableView:(UITableView *)tableView canEditRowAtIndexPath:(NSIndexPath *)indexPath {
-    return YES;
+    return BChatSDK.config.messageDeletionEnabled || BChatSDK.moderation;
 }
 
 // This only works for iOS8
@@ -807,7 +842,7 @@
     __weak __typeof__(self) weakSelf = self;
 
     id<PElmMessage> message = [self messageForIndexPath:indexPath];
-    if (message.senderIsMe && BChatSDK.config.messageDeletionEnabled) {
+    if ([BChatSDK.thread canDeleteMessage:message] && BChatSDK.config.messageDeletionEnabled) {
         UITableViewRowAction * button = [UITableViewRowAction rowActionWithStyle:UITableViewRowActionStyleDefault
                                                                            title:[NSBundle t:bDelete]
                                                                          handler:^(UITableViewRowAction *action, NSIndexPath *indexPath) {
@@ -823,7 +858,7 @@
         return @[button];
 
     }
-    else {
+    else if(BChatSDK.moderation.canFlagMessage) {
         NSString * flagTitle = message.flagged.intValue ? [NSBundle t:bUnflag] : [NSBundle t:bFlag];
         
         UITableViewRowAction * button = [UITableViewRowAction rowActionWithStyle:UITableViewRowActionStyleDefault title:flagTitle handler:^(UITableViewRowAction *action, NSIndexPath *indexPath) {
@@ -845,12 +880,17 @@
         return @[button];
     }
     
+    return @[];
 }
 
 #pragma Handle keyboard
 
 // Move the toolbar up
 -(void) keyboardWillShow: (NSNotification *) notification {
+    
+    if (_keyboardVisible) {
+        return;
+    }
     
     _keyboardVisible = YES;
     
@@ -910,6 +950,10 @@
 
 -(void) keyboardWillHide: (NSNotification *) notification {
     
+    if (!_keyboardVisible) {
+        return;
+    }
+    
     NSNumber *duration = [notification.userInfo objectForKey:UIKeyboardAnimationDurationUserInfoKey];
     NSNumber *curve = [notification.userInfo objectForKey:UIKeyboardAnimationCurveUserInfoKey];
     
@@ -945,18 +989,22 @@
     [UIView commitAnimations];
     
     // Disable the gesture recognizer so cell taps are recognized
-//    _tapRecognizer.enabled = NO;
+    _tapRecognizer.enabled = NO;
     
 }
 
 -(void) keyboardDidShow: (NSNotification *) notification {
     
+    if (!_keyboardVisible) {
+        return;
+    }
+
     // Get the keyboard size
     CGRect keyboardBounds = [[notification.userInfo objectForKey:UIKeyboardFrameEndUserInfoKey] CGRectValue];
     CGRect keyboardBoundsConverted = [self.view convertRect:keyboardBounds toView:Nil];
         
     // Enable the tap gesture recognizer to hide the keyboard
-//    _tapRecognizer.enabled = YES;
+    _tapRecognizer.enabled = YES;
 }
 
 
@@ -968,9 +1016,36 @@
     return 0;
 }
 
+-(void) keyboardWillChangeFrame: (NSNotification *) notification {
+    if (!_keyboardVisible) {
+        return;
+    }
+
+    // Get the keyboard size
+    CGRect keyboardBounds = [[notification.userInfo objectForKey:UIKeyboardFrameEndUserInfoKey] CGRectValue];
+    CGRect keyboardBoundsConverted = [self.view convertRect:keyboardBounds toView:Nil];
+
+    // Set the new constraints
+    _sendBarView.keepBottomInset.equal = keyboardBoundsConverted.size.height;
+    
+    [[UIApplication sharedApplication].windows.lastObject addSubview: _keyboardOverlay];
+    _keyboardOverlay.frame = keyboardBounds;
+
+}
+
 -(void) keyboardDidHide: (NSNotification *) notification {
+    
+    if (!_keyboardVisible) {
+        return;
+    }
+    
     [_keyboardOverlay removeFromSuperview];
     _keyboardVisible = NO;
+    
+    // Hide the options...
+    _keyboardOverlay.alpha = 0;
+    _keyboardOverlay.userInteractionEnabled = NO;
+    [_optionsHandler hide];
 }
 
 -(void) scrollToBottomOfTable: (BOOL) animated {
@@ -1006,18 +1081,24 @@
 
 -(void) reloadData: (BOOL) scroll animate: (BOOL) animate force: (BOOL) force {
     dispatch_async(dispatch_get_main_queue(), ^{
-        [UIView transitionWithView: self.tableView
-                          duration: animate ? 0.2f : 0
-                           options: UIViewAnimationOptionTransitionCrossDissolve
-                        animations: ^(void) {
-                            NSLog(@"Reload %@", NSStringFromSelector(_cmd));
-                            [self.tableView reloadData];
-                        }
-                        completion: ^(BOOL finished) {
-                            if (scroll) {
-                                [self scrollToBottomOfTable:animate force:force];
-                            }
-                        } ];
+        [self.tableView reloadData];
+        if (scroll) {
+            [self scrollToBottomOfTable:animate force:force];
+        }
+//
+//
+//        [UIView transitionWithView: self.tableView
+//                          duration: 0//animate ? 0.2f : 0
+//                           options: UIViewAnimationOptionTransitionCrossDissolve
+//                        animations: ^(void) {
+////                            NSLog(@"Reload %@", NSStringFromSelector(_cmd));
+//                            [self.tableView reloadData];
+//                        }
+//                        completion: ^(BOOL finished) {
+//                            if (scroll) {
+//                                [self scrollToBottomOfTable:animate force:force];
+//                            }
+//                        } ];
     });
 }
 
@@ -1069,7 +1150,6 @@
     [_sendBarView setSendBarDelegate:Nil];
     self.tableView.delegate = Nil;
     self.tableView.dataSource = Nil;
-    [_typingTimer invalidate];
     _typingTimer = Nil;
 }
 

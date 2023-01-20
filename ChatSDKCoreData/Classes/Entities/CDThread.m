@@ -21,6 +21,8 @@
 }
 
 - (void)reverse: (NSMutableArray *) array {
+    [self checkOnMain];
+    
     if ([array count] <= 1)
         return;
     NSUInteger i = 0;
@@ -35,22 +37,59 @@
 }
 
 -(NSArray *) allMessages {
+    [self checkOnMain];
     return self.messages.allObjects;
 }
 
 -(BOOL) hasMessages {
-    return self.newestMessage != Nil;
+    [self checkOnMain];
+    return self.newestMessage != nil;
 }
 
 -(void) addMessage: (id<PMessage>) theMessage {
     [self addMessage:theMessage toStart:NO];
 }
 
+-(void) addMessageAndSort: (id<PMessage>) theMessage {
+    // Check if the message has already been added
+    CDMessage * message = (CDMessage *) theMessage;
+
+    if ([self containsMessage:message]) {
+        return;
+    }
+    message.thread = self;
+    NSArray * messages = [BChatSDK.db loadMessagesForThread:self oldest:NSIntegerMax];
+    
+    int index = [messages indexOfObject:message];
+    if (index > 0) {
+        CDMessage * previous = messages[index - 1];
+        message.previousMessage = previous;
+        previous.nextMessage = message;
+        [previous updatePosition];
+    }
+    if(index < messages.count - 1) {
+        CDMessage * next = messages[index + 1];
+        message.nextMessage = next;
+        next.previousMessage = message;
+        [next updatePosition];
+    }
+    [message updatePosition];
+    
+    //    NSArray * messages = [BChatSDK.db loadMessagesForThread:self newest:1];
+    //    if (messages.count) {
+    //        return messages.firstObject;
+    //    }
+
+    self.newestMessage = messages.lastObject;
+    
+}
+
 -(void) addMessage: (id<PMessage>) theMessage toStart: (BOOL) toStart {
+    [self checkOnMain];
     CDMessage * message = (CDMessage *) theMessage;
     
     // Check if the message has already been added
-    if ([self.messages containsObject:message]) {
+    if ([self containsMessage:message]) {
         return;
     }
 
@@ -60,6 +99,9 @@
         if (oldestMessage) {
             message.nextMessage = oldestMessage;
             oldestMessage.previousMessage = message;
+        } else {
+            // if this is the first message...
+            self.newestMessage = theMessage;
         }
     } else {
         // Set the last message for this message
@@ -68,6 +110,7 @@
             message.previousMessage = newestMessage;
             newestMessage.nextMessage = message;
         }
+        self.newestMessage = message;
     }
     
     // Add the message to the thread
@@ -80,24 +123,42 @@
         [message.previousMessage updatePosition];
     }
     [message updatePosition];
-}
-
--(id<PMessage>) newestMessage {
-    NSArray * messages = [BChatSDK.db loadMessagesForThread:self newest:1];
-    if (messages.count) {
-        return messages.firstObject;
+    
+    if (BChatSDK.config.debugModeEnabled) {
+        [BCoreUtilities checkDuplicateThread];
+        [BCoreUtilities checkOnMain];
     }
-    return Nil;
+
 }
+//
+//-(id<PMessage>) newestMessage {
+//    [self checkOnMain];
+//    
+//    [self willAccessValueForKey:NSStringFromSelector(_cmd)];
+//    CDMessage * message = [self primativeNewestMessage];
+//    [self didAccessValueForKey:NSStringFromSelector(_cmd)];
+//
+//    if (!message) {
+//        NSArray * messages = [BChatSDK.db loadMessagesForThread:self newest:1];
+//        if (messages.count) {
+//            [self setNewestMessage:messages.firstObject];
+//        }
+//    }
+//    
+//    return message;
+//}
 
 -(id<PMessage>) oldestMessage {
+    [self checkOnMain];
     NSArray * messages = [BChatSDK.db loadMessagesForThread:self oldest:1];
     if (messages.count) {
         return messages.firstObject;
     }
     return Nil;
 }
+
 -(void) removeMessage: (id<PMessage>) theMessage {
+    [self checkOnMain];
     CDMessage * message = (CDMessage *) theMessage;
     
     CDMessage * previousMessage = message.previousMessage;
@@ -114,9 +175,20 @@
 
     message.thread = Nil;
     [BChatSDK.db deleteEntity:message];
+    
+    self.newestMessage = [[self messagesOrderedByDateNewestFirst] firstObject];
+}
+
+-(void) removeAllMessages {
+    NSArray * messages = self.allMessages;
+    for (CDMessage * message in messages) {
+        message.thread = nil;
+        [BChatSDK.db deleteEntity:message];
+    }
 }
 
 -(NSArray *) orderMessagesByDateAsc: (NSArray *) messages {
+    [self checkOnMain];
     return [messages sortedArrayUsingComparator:^(id<PMessage> m1, id<PMessage> m2) {
         return [m1.date compare:m2.date];
     }];
@@ -139,12 +211,14 @@
 }
 
 -(NSArray *) orderMessagesByDateDesc: (NSArray *) messages {
+    [self checkOnMain];
     return [messages sortedArrayUsingComparator:^(id<PMessage> m1, id<PMessage> m2) {
         return [m2.date compare:m1.date];
     }];
 }
 
 -(NSString *) displayName {
+    [self checkOnMain];
     if (self.type.intValue & bThreadFilterPrivate) {
         
         if (self.name && self.name.length) {
@@ -160,10 +234,15 @@
 }
 
 -(NSString *) memberListString {
+    [self checkOnMain];
     NSString * name = @"";
     
-    for (id<PUser> user in self.users) {
+    for (id<PUser> user in self.members) {
         if (!user.isMe) {
+            CDUserConnection * connection = [self connection:user.entityID];
+            if (connection && connection.affiliation.isOutcast) {
+                continue;
+            }
             if (user.name.length) {
                 name = [name stringByAppendingFormat:@"%@, ", user.name];
             }
@@ -176,57 +255,147 @@
     return Nil;
 }
 
--(void) markRead {
-    
-    BOOL didMarkRead = NO;
-    
-    for(id<PMessage> message in self.messages) {
-        if (!message.isRead && !message.senderIsMe) {
-            [message setRead: @YES];
-            
-            // TODO: Should we have this here? Maybe this gets called too soon
-            // but it's a good backup in case the app closes before we save
-            [message setDelivered: @YES];
-            didMarkRead = YES;
+-(NSArray<PUser> *) members {
+    NSMutableArray * members = [NSMutableArray new];
+    for (id<PUser> user in self.users) {
+        CDUserConnection * connection = [self connection:user.entityID];
+        if (connection && (connection.hasLeft || connection.affiliation.isOutcast)) {
+            continue;
         }
+        [members addObject:user];
     }
-    if (didMarkRead) {
-        [[NSNotificationCenter defaultCenter] postNotificationName:bNotificationThreadRead object:Nil];
-    }
+    return members;
+    
+}
+
+-(void) markRead {
+    [self checkOnMain];
+    [BChatSDK.db unreadMessages:self.entityID then:^(NSArray * messages) {
+        if (messages) {
+            BOOL didMarkRead = NO;
+            for (id<PMessage> message in messages) {
+                [message setDelivered: @YES];
+                [message setRead: @YES];
+                didMarkRead = YES;
+            }
+            if (didMarkRead) {
+                [BHookNotification notificationThreadMarkedRead:self];
+            }
+        }
+    }];
+
+//    BOOL didMarkRead = NO;
+//
+//
+//    NSArray<PMessage> * messages = [BChatSDK.db loadAllMessagesForThread:self newestFirst:YES];
+//    for(id<PMessage> message in messages) {
+//        if (!message.isRead && !message.senderIsMe) {
+//            [message setDelivered: @YES];
+//            [message setRead: @YES];
+//
+//            // TODO: Should we have this here? Maybe this gets called too soon
+//            // but it's a good backup in case the app closes before we save
+//            didMarkRead = YES;
+//        }
+//    }
+//    if (didMarkRead) {
+//        [BHookNotification notificationThreadMarkedRead:self];
+//    }
 }
 
 -(int) unreadMessageCount {
-    int i = 0;
-    NSArray<PMessage> * messages = [BChatSDK.db loadAllMessagesForThread:self newestFirst:YES];
-    for (id<PMessage> message in messages) {
-        if (!message.isRead && !message.senderIsMe) {
-            i++;
-        }
-    }
-    return i;
+    return [BChatSDK.db unreadMessagesCountNow:self.entityID];
 }
 
 -(id<PThread>) model {
     return self;
 }
 
--(void) addUser: (id<PUser>) user {
-    if ([user isKindOfClass:[CDUser class]]) {
-        if (![self.users containsObject:(CDUser *)user]) {
-            [self addUsersObject:(CDUser *)user];
+-(BOOL) addUser: (id<PUser>) user {
+    [self checkOnMain];
+    @synchronized (self) {
+        if ([user isKindOfClass:[CDUser class]]) {
+            if (![self containsUser:user]) {
+                [self addUsersObject:(CDUser *)user];
+                [self addConnection:(CDUser *)user];
+                return YES;
+            }
         }
+        return NO;
     }
 }
 
-- (void)removeUser:(id<PUser>) user {
+-(BOOL) addConnection: (id<PUser>) user {
+    @synchronized (self) {
+        if (![self connection:user.entityID]) {
+            CDUserConnection * connection = [BChatSDK.db fetchOrCreateUserConnectionWithID:user.entityID withType:bUserConnectionTypeMember];
+            [self addUserConnectionsObject:connection];
+            return YES;
+        }
+        return NO;
+    }
+}
+
+-(BOOL) removeConnection: (id<PUser>) user {
+    CDUserConnection * connection = [self connection:user.entityID];
+    if (connection) {
+        [self removeUserConnectionsObject:connection];
+        [BChatSDK.db deleteEntity:connection];
+        return YES;
+    }
+    return NO;
+}
+
+-(NSArray<PUserConnection> *) connections {
+    return self.userConnections.allObjects;
+}
+
+-(id<PUserConnection>) connection: (NSString *) entityID {
+    [self checkOnMain];
+    for (id<PUserConnection> u in self.userConnections) {
+        if ([u.entityID isEqualToString: entityID]) {
+            return u;
+        }
+    }
+    return nil;
+}
+
+- (BOOL) removeUser:(id<PUser>) user {
+    [self checkOnMain];
     if ([user isKindOfClass:[CDUser class]]) {
-        if ([self.users containsObject:(CDUser *)user]) {
+        if ([self containsUser: user]) {
             [self removeUsersObject:(CDUser *) user];
+            [self removeConnection:user];
+            return YES;
         }
     }
+    return NO;
 }
 
+-(BOOL) containsUser: (id<PUser>) user {
+    [self checkOnMain];
+    
+    for (id<PUser> u in self.users) {
+        if ([u.entityID isEqualToString:user.entityID]) {
+            return true;
+        }
+    }
+    
+    // Check connections too
+    return [self connection:user.entityID] != nil;
+}
+
+-(BOOL) containsMessage: (id<PMessage>) message {
+    [self checkOnMain];
+    for (id<PMessage> m in self.messages) {
+        if ([m.entityID isEqualToString:message.entityID]) {
+            return true;
+        }
+    }
+    return false;
+}
 -(id<PUser>) otherUser {
+    [self checkOnMain];
     id<PUser> currentUser = BChatSDK.currentUser;
     if (self.type.intValue == bThreadType1to1 || self.users.count == 2) {
         for (id<PUser> user in self.users) {
@@ -239,6 +408,7 @@
 }
 
 -(void) updateMeta: (NSDictionary *) dict {
+    [self checkOnMain];
     if (!self.meta) {
         self.meta = @{};
     }
@@ -250,106 +420,15 @@
 }
 
 -(void) removeMetaValueForKey: (NSString *) key {
+    [self checkOnMain];
     NSMutableDictionary * newMeta = [NSMutableDictionary dictionaryWithDictionary:self.meta];
     [newMeta removeObjectForKey:key];
     self.meta = newMeta;
 }
 
-// TODO: Move this to UI module
--(RXPromise *) imageForThread {
-
-    NSMutableArray * userPromises = [NSMutableArray new];
-    NSMutableArray * users = [NSMutableArray arrayWithArray:self.users.allObjects];
-    for (id<PUser> user in users) {
-        if (!user.image && !user.isMe) {
-            [userPromises addObject:user.updateAvatarFromURL];
-        }
-    }
-    
-    return [RXPromise all:userPromises].thenOnMain(^id(id result) {
-        return self.buildImageForThread;
-    }, Nil);
-}
-
-- (UIImage *) buildImageForThread {
-    NSMutableArray * users = [NSMutableArray arrayWithArray:self.users.allObjects];
-    
-    // Remove the current user from the array
-    [users removeObject:BChatSDK.currentUser];
-    
-    // Create a temporary array as we cannot loop through an array and remove users
-    NSMutableArray * tempUsers = [NSMutableArray arrayWithArray:users];
-    
-    // We want to remove any users who have the automatic profile picture
-    for (id<PUser> user in tempUsers) {
-        
-        // Check if the user picture has been uploaded
-        if (!user.image) {
-            [users removeObject:user];
-        }
-    }
-    
-    // If users array empty then just return the defaut picture
-    if (!users.count) {
-        
-        // Check how many users are in the conversation
-        if (self.type.intValue & bThreadFilterPublic) {
-            return [Icons getWithName:Icons.defaultGroup];
-        }
-        else {
-            return [Icons getWithName:Icons.defaultProfile];
-        }
-    }
-    else if (users.count == 1) {
-        // Only one user left so use their picture
-        id<PUser> user = users.firstObject;
-        return [UIImage imageWithData:user.image];
-    }
-    else {
-        
-        // When we get the user thumbnail image we make sure it is the size we want so resize it to be 100 x 100
-        UIImage * image1 = [[UIImage imageWithData:((id<PUser>)users.firstObject).image] resizeImageToSize:CGSizeMake(100, 100)];
-        
-        // Then crop the image
-        image1 = [image1 croppedImage:CGRectMake(25, 0, 49, 100)];
-        
-        // If there are two users then we need to split the picture in half
-        if (users.count == 2) {
-            
-            // When we get the user thumbnail image we make sure it is the size we want so resize it to be 100 x 100
-            UIImage * image2 = [[UIImage imageWithData:((id<PUser>)users.lastObject).image] resizeImageToSize:CGSizeMake(100, 100)];
-            
-            // Then crop the image
-            image2 = [image2 croppedImage:CGRectMake(25, 0, 49, 100)];
-            
-            // Combine the images
-            UIGraphicsBeginImageContextWithOptions(CGSizeMake(100, 100), NO, 0.0);
-            
-            [image1 drawInRect:CGRectMake(0, 0, 49, 100)];
-            [image2 drawInRect:CGRectMake(51, 0, 49, 100)];
-        }
-        else {
-            
-            // Thumbnails done by using parse change
-            UIImage * image2 = [UIImage imageWithData:((id<PUser>)users[1]).image];
-            UIImage * image3 = [UIImage imageWithData:((id<PUser>)users[2]).image];
-            
-            // Combine the images
-            UIGraphicsBeginImageContextWithOptions(CGSizeMake(100, 100), NO, 0.0);
-            
-            [image1 drawInRect:CGRectMake(0, 0, 49, 100)];
-            [image2 drawInRect:CGRectMake(51, 0, 49, 49)];
-            [image3 drawInRect:CGRectMake(51, 51, 49, 49)];
-        }
-        
-        UIImage * finalImage = UIGraphicsGetImageFromCurrentImageContext();
-        
-        UIGraphicsEndImageContext();
-        
-        return finalImage;
-    }}
-
 -(NSDate *) orderDate {
+    [self checkOnMain];
+
     id<PMessage> message = self.newestMessage;
     if (message) {
         return message.date;
@@ -360,10 +439,12 @@
 }
 
 -(BOOL) isEqualToEntity: (id<PEntity>) entity {
+    [self checkOnMain];
     return [self.entityID isEqualToString:entity.entityID];
 }
 
 -(BOOL) isReadOnly {
+    [self checkOnMain];
     id readOnly = self.meta[bReadOnly];
     if (readOnly) {
         if([readOnly isKindOfClass:NSNumber.class]) {
@@ -375,6 +456,42 @@
         }
     }
     return false;
+}
+
+-(BOOL) typeIs: (bThreadType) type {
+    return self.type.intValue & type;
+}
+
+-(NSString *) imageURL {
+    NSString * url = [self.meta metaValueForKey:bImageURL];
+//    if ((!url || !url.length) && ([self typeIs:bThreadType1to1] || self.users.count == 2)) {
+//        return self.otherUser.imageURL;
+//    }
+    return url;
+}
+
+-(void) setImageURL: (NSString *) url {
+    [self updateMeta:@{bImageURL: url}];
+}
+
+-(void) markDeleted: (BOOL) notify {
+    self.deletedDate = [NSDate date];
+    [self markRead];
+    [self removeAllMessages];
+    if (notify) {
+        [BHookNotification notificationThreadRemoved:self];
+    }
+}
+
+-(void) setCanDeleteMessagesFromDate: (NSDate *) date {
+    [self setMetaValue:date forKey:bCanDeleteMessagesFrom];
+}
+
+-(NSDate *) canDeleteMessagesFromDate {
+    if (BChatSDK.config.messageDeletionListenerLimit < 0) {
+        return [NSDate dateWithTimeIntervalSince1970:0];
+    }
+    return self.meta[bCanDeleteMessagesFrom];
 }
 
 @end

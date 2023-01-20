@@ -65,42 +65,65 @@
     
     _anonymousProfilePicture = [Icons getWithName:Icons.defaultProfile];
     profilePictureButton.layer.cornerRadius = 50;
-    
+    profilePictureButton.imageView.contentMode = UIViewContentModeScaleAspectFill;
+
     self.hideSectionsWithHiddenRows = YES;
     
     [self refreshInterfaceAnimated:NO];
-
-    [[NSNotificationCenter defaultCenter] addObserverForName:bNotificationUserUpdated
-                                                      object:Nil
-                                                       queue:Nil
-                                                  usingBlock:^(NSNotification * notification) {
-                                                      dispatch_async(dispatch_get_main_queue(), ^{
-                                                          [self reloadDataAnimated:NO];
-                                                      });
-
-    }];
     
+    [_notificationList add:[BChatSDK.hook addHook:[BHook hookOnMain:^(NSDictionary * dict) {
+        id<PUser> user = dict[bHook_PUser];
+        if (user) {
+            [self reloadDataAnimated:NO];
+            [self refreshInterfaceAnimated:NO];
+        }
+    }] withName:bHookUserUpdated]];
+    
+    __weak __typeof(self) weakSelf = self;
     [BChatSDK.hook addHook:[BHook hook:^(NSDictionary * data) {
-        user = Nil;
+        weakSelf.user = Nil;
     }] withName:bHookDidLogout];
     
 //    NSString * backButtonTitle = self.title;
 //    if (backButtonTitle.length > 9) {
 //        backButtonTitle = [[backButtonTitle substringToIndex:9] stringByAppendingString:@"..."];
 //    }
+    
+    
+    if (@available(iOS 13.0, *)) {
+
+    } else {
+        if([self presentingViewController]) {
+            self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:[NSBundle t:bBack] style:UIBarButtonItemStylePlain target:self action:@selector(back)];
+        }
+    }
+    
+
     self.navigationItem.backBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:self.title style:UIBarButtonItemStylePlain target:Nil action:Nil];
+    self.navigationItem.titleView = [BReconnectingView new];
 
-    [_notificationList add:[[NSNotificationCenter defaultCenter] addObserverForName:bNotificationUserUpdated
-                                                                      object:Nil
-                                                                       queue:Nil
-                                                                  usingBlock:^(NSNotification * notification) {
-                                                                      dispatch_async(dispatch_get_main_queue(), ^{
-                                                                          [self refreshInterfaceAnimated:NO];
-                                                                      });
-    }]];
-    
-    
+    self.localityLabel.textColor = [Colors getWithName:Colors.mediumGray];
+    self.phoneNumberLabel.textColor = [Colors getWithName:Colors.mediumGray];
+    self.emailLabel.textColor = [Colors getWithName:Colors.mediumGray];
 
+    self.addContactLabel.textColor = [Colors getWithName:Colors.mediumGray];
+//    self.moreLabel.textColor = [Colors getWithName:Colors.mediumGray];
+    self.moreLabel.tintColor = [Colors getWithName:Colors.mediumGray];
+    self.statusTextView.textColor = [Colors getWithName:Colors.mediumGray];
+    self.blockTextView.textColor = [Colors getWithName:Colors.mediumGray];
+    self.availabilityLabel.textColor = [Colors getWithName:Colors.mediumGray];
+    
+}
+
+-(void) settings {
+    UIViewController * settingsViewController = BChatSDK.ui.settingsViewController;
+    if (settingsViewController) {
+        [self presentViewController:settingsViewController animated:true completion:nil];
+    }
+}
+
+-(void) back {
+    [self dismissViewControllerAnimated:true completion:nil];
 }
 
 -(void) viewWillAppear:(BOOL)animated {
@@ -108,6 +131,10 @@
     
     if(!user) {
         user = BChatSDK.currentUser;
+    }
+    
+    if (!self.navigationItem.leftBarButtonItem && user.isMe && BChatSDK.ui.settingsSections.count > 0 && BChatSDK.ui.settingsViewController) {
+        self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithImage:[NSBundle uiImageNamed:@"icn_25_settings"] style:UIBarButtonItemStylePlain target:self action:@selector(settings)];
     }
     
     [self refreshInterfaceAnimated:NO];
@@ -134,12 +161,26 @@
     self.profilePictureButton.userInteractionEnabled = NO;
     if (!self.user.isMe) {
         self.title = user.name;
-        self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithImage:[NSBundle uiImageNamed:@"icn_22_chat"]
-                                                                                  style:UIBarButtonItemStylePlain
-                                                                                 target:self
-                                                                                 action:@selector(startChat)];
+        
+        NSMutableArray * rightBarButtonItems = [NSMutableArray new];
+        
+        UIBarButtonItem * chatItem = [[UIBarButtonItem alloc] initWithImage:[NSBundle uiImageNamed:@"icn_25_chat"]
+                                                                      style:UIBarButtonItemStylePlain
+                                                                     target:self
+                                                                     action:@selector(startChat)];
+
+        if (BChatSDK.call) {
+            [rightBarButtonItems addObject:chatItem];
+            [rightBarButtonItems addObject:[[UIBarButtonItem alloc] initWithImage:[NSBundle uiImageNamed:@"icn_25_call"]
+                                                                          style:UIBarButtonItemStylePlain
+                                                                         target:self
+                                                                  action:@selector(startCall)]];
+            self.navigationItem.rightBarButtonItems = rightBarButtonItems;
+        } else {
+            self.navigationItem.rightBarButtonItem = chatItem;
+        }
+
     }
-    
     //
     // Name
     //
@@ -247,11 +288,6 @@
     id<PUserConnection> userConnection = self.userConnection;
     BUserConnectionWrapper * wrapper = [BUserConnectionWrapper wrapperWithConnection:userConnection];
     
-    // Presence
-    BOOL hideFollow = !userConnection || !userConnection.subscriptionType || !wrapper.ask;
-    [self cell:_followsCell setHidden:hideFollow];
-    [self cell:_followedCell setHidden:hideFollow];
-    
     UIImage * tick = [NSBundle uiImageNamed:@"icn_36_tick"];
     UIImage * cross = [NSBundle uiImageNamed:@"icn_36_cross"];
     UIImage * clock = [NSBundle uiImageNamed:@"icn_36_clock"];
@@ -281,11 +317,13 @@
     }
     if (cell.tag == bAddContactCellTag) {
         if (self.isContact) {
-            [[[UIAlertView alloc] initWithTitle:[NSBundle t:bDeleteContact]
-                                        message:[NSBundle t:bDeleteContactMessage]
-                                       delegate:self
-                              cancelButtonTitle:[NSBundle t:bCancel]
-                              otherButtonTitles:[NSBundle t:bOk], nil] show];
+            __weak __typeof(self) weakSelf = self;
+            UIAlertAction * okAction = [UIAlertAction actionWithTitle:[NSBundle t:bOk] style:UIAlertActionStyleDefault handler:^(UIAlertAction * action) {
+                __typeof(self) strongSelf = weakSelf;
+                [strongSelf deleteUser];
+                [strongSelf dismissViewControllerAnimated:YES completion:nil];
+            }];
+            [self alertWithTitle:[NSBundle t:bDeleteContact] withMessage:[NSBundle t:bDeleteContactMessage] actions: @[okAction]];
         } else {
             [self addContact];
         }
@@ -305,7 +343,7 @@
 }
 
 - (CGFloat)tableView:(UITableView *)tableView heightForFooterInSection:(NSInteger)section {
-    int staticSections = [super numberOfSectionsInTableView:tableView];
+    NSInteger staticSections = [super numberOfSectionsInTableView:tableView];
     if (section < staticSections) {
         return [super tableView: tableView heightForFooterInSection:section];
     } else {
@@ -329,15 +367,16 @@
     blockUserActivityIndicator.hidden = NO;
     [blockUserActivityIndicator startAnimating];
     
+    __weak __typeof(self) weakSelf = self;
     promise_completionHandler_t success = ^id(id success) {
-        self.blockImageView.highlighted = isBlocked;
-        self.blockTextView.text = isBlocked ? [NSBundle t:bUnblock] : [NSBundle t:bBlock];
-        self.blockUserActivityIndicator.hidden = YES;
+        weakSelf.blockImageView.highlighted = isBlocked;
+        weakSelf.blockTextView.text = isBlocked ? [NSBundle t:bUnblock] : [NSBundle t:bBlock];
+        weakSelf.blockUserActivityIndicator.hidden = YES;
         return Nil;
     };
     
     promise_errorHandler_t error = ^id(NSError * error) {
-        self.blockUserActivityIndicator.hidden = YES;
+        weakSelf.blockUserActivityIndicator.hidden = YES;
         return Nil;
     };
     
@@ -355,21 +394,23 @@
 }
 
 -(void) deleteUser {
+    __weak __typeof(self) weakSelf = self;
     [BChatSDK.contact deleteContact:self.user withType:bUserConnectionTypeContact].thenOnMain(^id(id success) {
-        [self refreshInterfaceAnimated:NO];
+        [weakSelf refreshInterfaceAnimated:NO];
         return Nil;
     }, ^id(NSError * error) {
-        [UIView alertWithTitle:[NSBundle t:bErrorTitle] withError:error];
+        [weakSelf alertWithTitle:[NSBundle t:bErrorTitle] withError:error];
         return Nil;
     });
 }
 
 -(void) addContact {
+    __weak __typeof(self) weakSelf = self;
     [BChatSDK.contact addContact:self.user withType:bUserConnectionTypeContact].thenOnMain(^id(id success) {
-        [self refreshInterfaceAnimated:NO];
+        [weakSelf refreshInterfaceAnimated:NO];
         return Nil;
     }, ^id(NSError * error) {
-        [UIView alertWithTitle:[NSBundle t:bErrorTitle] withError:error];
+        [weakSelf alertWithTitle:[NSBundle t:bErrorTitle] withError:error];
         return Nil;
     });
 }
@@ -385,11 +426,14 @@
 
 -(void) startChat {
     [BChatSDK.thread createThreadWithUsers:@[self.user] threadCreated:^(NSError * error, id<PThread> thread) {
-        BChatViewController * cvc = [[BInterfaceManager sharedManager].a chatViewControllerWithThread:thread];
+        UIViewController * cvc = [BChatSDK.ui chatViewControllerWithThread:thread];
         [self.navigationController pushViewController:cvc animated:YES];
     }];
 }
 
+-(void) startCall {
+    [BChatSDK.call callWithUser:self.user.entityID viewController: self];
+}
 
 -(BOOL) isContact {
     id<PUserConnection> userConnection = self.userConnection;
@@ -397,18 +441,14 @@
     return userConnection && userConnection.type.intValue == bUserConnectionTypeContact;
 }
 
-- (void)alertView:(UIAlertView *)alertView clickedButtonAtIndex:(NSInteger)buttonIndex {
-    if (buttonIndex) {
-        [self deleteUser];
-    }
-}
 
 - (IBAction)editButtonPressed:(id)sender {
-    
-    //[[BNetworkManager sharedManager].authenticationAdapter logout];
-    
-    BDetailedEditProfileTableViewController * vc = [[self storyboard] instantiateViewControllerWithIdentifier:@"EditProfile"];
-    vc.profileViewController = self;
+
+//    BDetailedEditProfileTableViewController * vc = [[self storyboard] instantiateViewControllerWithIdentifier:@"EditProfile"];
+//    vc.profileViewController = self;
+
+    BDetailedEditProfileTableViewController * vc = [BChatSDK.ui editProfileViewControllerWithParent:self];
+
     UINavigationController * nc = [[UINavigationController alloc] initWithRootViewController:vc];
     [self presentViewController:nc animated:YES completion:Nil];
 }
@@ -418,7 +458,9 @@
 }
 
 - (IBAction)moreButtonPressed:(id)sender {
-    [self presentViewController:[BChatSDK.ui profileOptionsViewControllerWithUser:user] animated:YES completion:Nil];
+    UIViewController * vc = [BChatSDK.ui profileOptionsViewControllerWithUser:user];
+    UINavigationController * nvc = [[UINavigationController alloc] initWithRootViewController:vc];
+    [self presentViewController: nvc animated:YES completion:Nil];
 }
 
 

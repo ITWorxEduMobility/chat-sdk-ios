@@ -23,9 +23,6 @@
     self = [super initWithStyle:style reuseIdentifier:reuseIdentifier];
     if (self) {
         
-//        map = [BMapViewManager sharedManager].mapFromPool;
-//        [self.bubbleImageView addSubview:map.mapView];
-        
         mapImageView = [[UIImageView alloc] init];
         mapImageView.layer.cornerRadius = 10;
         mapImageView.clipsToBounds = YES;
@@ -50,7 +47,6 @@
     
     float longitude = [self.message.meta[bMessageLongitude] floatValue];
     float latitude = [self.message.meta[bMessageLatitude] floatValue];
-        
     
     [mapImageView sd_setImageWithURL:[GoogleUtils getMapImageURLWithLatitude:latitude longitude:longitude width:bMaxMessageWidth height:bMaxMessageHeight]
                     placeholderImage:Nil

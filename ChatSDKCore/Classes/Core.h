@@ -11,6 +11,8 @@
 
 #define bCoreBundleName @"Frameworks/ChatSDK.framework/ChatCore"
 
+
+
 #import <RXPromise/RXPromise.h>
 #import <RXPromise/RXPromise+RXExtension.h>
 #import <DateTools/NSDate+DateTools.h>
@@ -25,6 +27,7 @@
 #import <ChatSDK/NSDate+Additions.h>
 #import <ChatSDK/NSDictionary+Meta.h>
 #import <ChatSDK/NSString+Safe.h>
+#import <ChatSDK/NSObject+ThreadCheck.h>
 
 #import <ChatSDK/PStorageAdapter.h>
 #import <ChatSDK/PNetworkAdapter.h>
@@ -36,6 +39,7 @@
 #import <ChatSDK/BCoreUtilities.h>
 #import <ChatSDK/BFileCache.h>
 #import <ChatSDK/BAvailabilityState.h>
+#import <ChatSDK/BLogger.h>
 
 #import <ChatSDK/PEntity.h>
 #import <ChatSDK/PEntityWrapper.h>
@@ -45,7 +49,6 @@
 #import <ChatSDK/PThread_.h>
 #import <ChatSDK/PThreadWrapper.h>
 #import <ChatSDK/PUser.h>
-#import <ChatSDK/PUserAccount.h>
 #import <ChatSDK/PUserWrapper.h>
 #import <ChatSDK/PGroup.h>
 #import <ChatSDK/PModule.h>
@@ -89,6 +92,7 @@
 #import <ChatSDK/PLocationViewController.h>
 #import <ChatSDK/PFriendsListViewController.h>
 #import <ChatSDK/BMessageBuilder.h>
+#import <ChatSDK/BAbstractThreadHandler.h>
 
 #import <ChatSDK/BHook.h>
 #import <ChatSDK/PHookHandler.h>
@@ -111,5 +115,8 @@
 #import <ChatSDK/BBackgroundPushAction.h>
 
 #import <ChatSDK/bPictureTypes.h>
+
+#import <ChatSDK/PNetworkAdapterProvider.h>
+#import <ChatSDK/PInterfaceAdapterProvider.h>
 
 #endif /* ChatCore_h */

@@ -12,7 +12,7 @@
 @class BNotificationObserverList;
 @class BHook;
 
-@interface BThreadsViewController : UIViewController<UITableViewDataSource, UITableViewDelegate, UINavigationControllerDelegate, UITabBarDelegate, UIAlertViewDelegate> {
+@interface BThreadsViewController : UIViewController<UITableViewDataSource, UITableViewDelegate, UINavigationControllerDelegate, UITabBarDelegate> {
     UIBarButtonItem * _editButton;
     
     NSMutableArray * _threads;
@@ -20,8 +20,8 @@
     id _typingObserver;
     NSMutableDictionary * _threadTypingMessages;
     
-    BNotificationObserverList * _notificationList;
-
+    BNotificationObserverList * _disposeOnDisappear;
+    BNotificationObserverList * _disposeOnDealloc;
 }
 
 @property (nonatomic, readwrite) UITableView *tableView;
@@ -29,10 +29,22 @@
 
 -(instancetype) initWithNibName:(NSString *)nibNameOrNil bundle:(NSBundle *)nibBundleOrNil;
 
+-(void) updateLocalNotificationHandler;
 -(void) pushChatViewControllerWithThread: (id<PThread>) thread;
--(void) reloadData;
 -(void) setEditingEnabled: (BOOL) enabled;
 -(void) toggleEditing;
 -(void) createThread;
+
+// Load the threads from the database
+-(void) loadThreads;
+
+// Reload threads, sort and refresh the table view
+-(void) loadThreadsAndReloadData;
+
+// Reload the tableView
+-(void) sortAndReloadData;
+
+// Reload the tableView
+-(void) reloadData;
 
 @end

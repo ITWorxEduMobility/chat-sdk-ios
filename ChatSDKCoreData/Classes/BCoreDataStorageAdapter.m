@@ -19,80 +19,133 @@ static void * kMainQueueKey = (void *) "Key1";
 
 -(instancetype) init {
     if ((self = [super init])) {
+        
+        _entityCache = [NSMutableDictionary new];
+        
         [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationWillResignActiveNotification object:Nil queue:0 usingBlock:^(NSNotification * notification) {
-            [self saveToStore];
+            
+            [self save];
+            
         }];
-        [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationWillTerminateNotification object:Nil queue:0 usingBlock:^(NSNotification * notification) {
-            [self saveToStore];
-        }];
+
         [[NSNotificationCenter defaultCenter] addObserverForName:NSManagedObjectContextDidSaveNotification object:Nil queue:0 usingBlock:^(NSNotification * notification) {
             [self privateQueueObjectContextDidSaveNotification:notification];
         }];
         [[NSNotificationCenter defaultCenter] addObserverForName:NSManagedObjectContextObjectsDidChangeNotification object:Nil queue:0 usingBlock:^(NSNotification * notification) {
+            
+            NSDictionary * info = notification.userInfo;
+            
+//            NSSet * updated = info[@"updated"];
+//            NSSet * inserted = info[@"inserted"];
+//            NSSet * deleted = info[@"deleted"];
+//
+//            NSString * moc = @"";
+//            if ([notification.object isEqual:_parentMoc]) {
+//                moc = @"Parent";
+//            }
+//            if ([notification.object isEqual:_mainMoc]) {
+//                moc = @"Main";
+//            }
+//            if ([notification.object isEqual:_backgroundMoc]) {
+//                moc = @"Background";
+//            }
+//
+//            if (updated) {
+//
+//            }
+//            if (inserted) {
+//                for (NSManagedObject * entity in inserted) {
+//                    if ([entity isKindOfClass:CDThread.class]) {
+//
+//                        CDThread * thread = (CDThread *) entity;
+//
+//                        NSLog(@"Insert Thread %@ %@", moc, thread.entityID);
+//
+////                        [_mainMoc performBlock:^{
+////                            NSArray * items = [self fetchEntitiesWithName:bThreadEntity];
+////                            NSMutableDictionary * dict = [NSMutableDictionary new];
+////                            for (id<PThread> thread in items) {
+////                                id<PThread> dup = dict[thread.entityID];
+////                                if (dup) {
+////                                    NSLog(@"Duplicate!");
+////                                } else {
+////                                    dict[thread.entityID] = thread;
+////                                }
+////                            }
+////                        }];
+//                    }
+//
+//                }
+//            }
+//            if (deleted) {
+//
+//            }
+            
+            
             [self privateQueueObjectContextDidChangeNotification:notification];
         }];
         
+        [BChatSDK.hook addHook:[BHook hookOnMain:^(NSDictionary * dict) {
+            NSString * currentUserID = BChatSDK.currentUserID;
+            for (CDThread * thread in BChatSDK.currentUser.threads) {
+                if (!thread.userAccountID) {
+                    thread.userAccountID = currentUserID;
+                }
+            }
+        }] withName:bHookDidAuthenticate];
+        
     }
     
-    dispatch_queue_set_specific(dispatch_get_main_queue(), kMainQueueKey, kMainQueueKey, Nil);
-    
-    _privateMoc = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSPrivateQueueConcurrencyType];
-    _privateMoc.persistentStoreCoordinator = self.persistentStoreCoordinator;
+    _mainMoc = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSMainQueueConcurrencyType];
+//    _mainMoc.parentContext = _parentMoc;
+    _mainMoc.persistentStoreCoordinator = self.persistentStoreCoordinator;
+    _mainMoc.automaticallyMergesChangesFromParent = YES;
+    _mainMoc.mergePolicy = NSErrorMergePolicy;
 
-    _moc = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSMainQueueConcurrencyType];
-    _moc.parentContext = _privateMoc;
+    _backgroundMoc = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSPrivateQueueConcurrencyType];
+    _backgroundMoc.parentContext = _mainMoc;
+    _backgroundMoc.automaticallyMergesChangesFromParent = YES;
+    _backgroundMoc.mergePolicy = NSErrorMergePolicy;
 
     NSUndoManager *undoManager = [[NSUndoManager alloc] init];
-    [_moc setUndoManager:undoManager];
-    [_moc setAutomaticallyMergesChangesFromParent:YES];
-    
-//    _backgroundMoc = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSPrivateQueueConcurrencyType];
-//    _backgroundMoc.parentContext = _privateMoc;
-//
-//    NSUndoManager * undoManager2 = [[NSUndoManager alloc] init];
-//    [_backgroundMoc setUndoManager:undoManager2];
-//    [_backgroundMoc setAutomaticallyMergesChangesFromParent:YES];
+    [_mainMoc setUndoManager:undoManager];
     
     return self;
 }
 
--(void) saveToStore {
-    [self saveWithPromise].then(^id(id success) {
-        return [self save:_privateMoc];
-    }, Nil);
+-(NSManagedObjectContext *) mainMoc {
+    return _mainMoc;
 }
 
--(RXPromise *) saveWithPromise {
-    return [RXPromise all:@[[self save:_moc],
-                            //[self save:_backgrondMoc]
-    ]];
+-(void) saveBackground {
+    [_backgroundMoc performBlock:^{
+        [self save:_backgroundMoc];
+    }];
 }
 
--(RXPromise *) save: (NSManagedObjectContext *) context {
-    RXPromise * promise = [RXPromise new];
-    
-    [context performBlock:^{
-        @try {
-            if (context.hasChanges) {
-                NSError *error = nil;
-                if (![context save:&error]) {
-                    NSLog(@"Error saving context: %@\n%@", [error localizedDescription], [error userInfo]);
-                    [promise rejectWithReason:error];
-                    return;
-                }
-            }
-            [promise resolveWithResult:Nil];
+-(void) save: (NSManagedObjectContext *) context {
+    @try {
+        NSError *error = nil;
+        if (![context save:&error]) {
+            [BChatSDK.shared.logger log: @"Error saving context: %@\n%@", [error localizedDescription], [error userInfo]];
         }
-        @catch (NSException * e) {
-            NSLog(@"Error saving context: %@\n%@", [e name], [e description]);
-            [promise rejectWithReason:e];
+    }
+    @catch (NSException * e) {
+        [BChatSDK.shared.logger log: @"Error saving context: %@\n%@", [e name], [e description]];
+    }
+}
+
+-(void) save {
+    [self saveFinally:nil];
+}
+
+-(void) saveFinally: (Completion) completion {
+    [_mainMoc performBlock:^{
+        [self save:_mainMoc];
+        if (completion != nil) {
+            completion();
         }
     }];
-    return promise;
-}
-
--(RXPromise *) save {
-    return [self saveWithPromise];
 }
 
 -(NSArray *) fetchEntitiesWithName: (NSString *) entityName {
@@ -100,9 +153,15 @@ static void * kMainQueueKey = (void *) "Key1";
 }
 
 -(id) executeFetchRequest: (NSFetchRequest *) fetchRequest entityName: (NSString *) entityName predicate: (NSPredicate *) predicate {
+    return [self executeFetchRequest:fetchRequest entityName:entityName predicate:predicate context:_mainMoc];
+}
+
+-(id) executeFetchRequest: (NSFetchRequest *) fetchRequest entityName: (NSString *) entityName predicate: (NSPredicate *) predicate context: (NSManagedObjectContext *) context {
     [fetchRequest setIncludesPendingChanges:YES];
     
-    NSManagedObjectContext * context = self.managedObjectContextForThread;
+    if (!context) {
+        context = _mainMoc;
+    }
     
     NSEntityDescription * entity = [NSEntityDescription entityForName:entityName inManagedObjectContext:context];
     if (!entity) {
@@ -117,7 +176,7 @@ static void * kMainQueueKey = (void *) "Key1";
     NSError * error = Nil;
     NSArray * entities = [context executeFetchRequest:fetchRequest error:&error];
     if (error) {
-        NSLog(@"Fetch error: %@", error.localizedDescription);
+        [BChatSDK.shared.logger log: @"Fetch error: %@", error.localizedDescription];
     }
     return entities;
     
@@ -129,16 +188,31 @@ static void * kMainQueueKey = (void *) "Key1";
 
 -(NSArray *) fetchUserConnectionsWithType: (bUserConnectionType) type entityID: (nullable NSString *) entityID {
     id<PUser> currentUser = BChatSDK.currentUser;
+    NSString * currentUserID = currentUser.entityID;
 
     NSPredicate * predicate;
     if (entityID) {
-        predicate = [NSPredicate predicateWithFormat:@"type = %@ AND owner = %@ AND entityID = %@", @(type), currentUser, entityID];
+        predicate = [NSPredicate predicateWithFormat:@"type = %@ AND owner = %@ AND entityID = %@ AND owner.userAccountID = %@", @(type), currentUser, entityID, currentUserID];
     }
     else {
-        predicate = [NSPredicate predicateWithFormat:@"type = %@ AND owner = %@", @(type), currentUser];
+        predicate = [NSPredicate predicateWithFormat:@"type = %@ AND owner = %@ AND owner.userAccountID = %@", @(type), currentUser, currentUserID];
     }
 
     return [BChatSDK.db fetchEntitiesWithName:bUserConnectionEntity withPredicate:predicate];
+}
+
+-(id) fetchOrCreateUserConnectionWithID: (NSString *) entityID withType: (bUserConnectionType) type {
+    NSArray * results = [self fetchUserConnectionsWithType:type entityID:entityID];
+        
+    for (id result in results) {
+        return result;
+    }
+    
+    CDUserConnection * connection = [self createEntity:bUserConnectionEntity];
+    connection.entityID = entityID;
+    connection.type = @(type);
+    
+    return connection;
 }
 
 -(NSArray *) fetchEntitiesWithName: (NSString *) entityName withPredicate: (NSPredicate *) predicate {
@@ -146,56 +220,85 @@ static void * kMainQueueKey = (void *) "Key1";
 }
 
 -(id) fetchEntityWithID: (NSString *) entityID withType: (NSString *) type {
-    NSPredicate * predicate = [NSPredicate predicateWithFormat:@"entityID = %@", entityID];
+    NSPredicate * predicate = [NSPredicate predicateWithFormat:@"entityID = %@ AND userAccountID = %@", entityID, BChatSDK.currentUserID];
     // Copy it to stop a mutation error
-    NSArray * results = [[self fetchEntitiesWithName:type withPredicate:predicate] copy];
+    NSArray * results = [NSArray arrayWithArray:[self fetchEntitiesWithName:type withPredicate:predicate]];
+    
+    if (results.count > 1) {
+        [BChatSDK.shared.logger log: @"Error: Fetch entity with ID: %@, type: %@", entityID, type];
+        [BChatSDK.shared.logger log: @"Error: Fetch entity with ID, duplicate items %@", results];
+    }
+    
     for (id result in results) {
         return result;
     }
     return Nil;
 }
 
-//-(RXPromise *) performOnPrivate:(id (^)(void))block  {
-//    return [self performOn:self.backgroundManagedObjectContext withBlock:block];
-//}
-
--(RXPromise *) performOnMain:(id(^)(void)) block  {
-    return [self performOn:self.managedObjectContext withBlock:block];
+-(NSUInteger) fetchEntityCountWithID: (NSString *) entityID withType: (NSString *) type {
+    return [self fetchEntityCountWithID:entityID withType:type context:_mainMoc];
 }
 
-//-(RXPromise *) performOnPrivateAndSave:(id (^)(void))block  {
-//    return [self performOnAndSave:self.backgroundManagedObjectContext withBlock:block];
-//}
-
--(RXPromise *) performOnMainAndSave:(id(^)(void)) block  {
-    return [self performOnAndSave:self.managedObjectContext withBlock:block];
+-(NSUInteger) fetchEntityCountWithID: (NSString *) entityID withType: (NSString *) type context: (NSManagedObjectContext *) context {
+    NSPredicate * predicate = [NSPredicate predicateWithFormat:@"entityID = %@ AND userAccountID = %@", entityID, BChatSDK.currentUserID];
+    return [self fetchEntityCountWithPredicate:predicate withType:type context:context];
 }
 
--(RXPromise *) performOnAndSave: (NSManagedObjectContext *) context withBlock: (id(^)(void)) block {
-    RXPromise * promise = [RXPromise new];
-    [context performBlock:^{
-        id result = block();
-        if(context.hasChanges) {
-            NSError * error;
-            [context save:&error];
-            if(error) {
-                NSLog(@"Error %@", error.localizedDescription);
-            }
+-(NSUInteger) fetchEntityCountWithPredicate: (NSPredicate *) predicate withType: (NSString *) type context: (NSManagedObjectContext *) context {
+    NSFetchRequest * request = [NSFetchRequest fetchRequestWithEntityName:type];
+    request.includesPendingChanges = true;
+    request.predicate = predicate;
+    
+    NSError * error = nil;
+    NSUInteger count = [context countForFetchRequest:request error:&error];
+    if (count != NSNotFound) {
+        return count;
+    } else {
+        return 0;
+    }
+}
+
+-(BOOL) entityExistsWithID: (NSString *) entityID withType: (NSString *) type {
+    return [self fetchEntityCountWithID:entityID withType:type] != 0;
+}
+
+-(void) performOnMain: (Completion) block {
+    [_mainMoc performBlock:^{
+        if (block != nil) {
+            block();
         }
-        [promise resolveWithResult:result];
     }];
-    return promise;
 }
 
--(RXPromise *) performOn: (NSManagedObjectContext *) context withBlock: (id(^)(void)) block {
-    RXPromise * promise = [RXPromise new];
-    [context performBlock:^{
-        id result = block();
-        [promise resolveWithResult:result];
+-(void) performOnMainAndWait:(Completion) block {
+    [_mainMoc performBlockAndWait:^{
+        block();
     }];
-    return promise;
 }
+
+-(void) performOnMainAndSave:(Completion) beforeSave finally: (Completion) afterSave {
+    return [self performOnAndSave:_mainMoc then:beforeSave finally:afterSave];
+}
+
+-(void) performOnAndSave: (NSManagedObjectContext *) context then: (Completion) beforeSave finally: (Completion) afterSave {
+    [context performBlock:^{
+        if (beforeSave != nil) {
+            beforeSave();
+        }
+        [self save:context];
+        if (afterSave != nil) {
+            afterSave();
+        }
+    }];
+}
+
 -(id) fetchOrCreateEntityWithID: (NSString *) entityID withType: (NSString *) type {
+    
+    if (!entityID.length) {
+        [BChatSDK.shared.logger log:@"Error: Tried to create entity of type %@ with nil entity ID", type];
+        return nil;
+    }
+    
     id<PEntity> entity = [self fetchEntityWithID:entityID withType:type];
     if (!entity) {
         entity = [self createEntity:type];
@@ -218,50 +321,43 @@ static void * kMainQueueKey = (void *) "Key1";
 }
 
 -(id) createEntity: (NSString *) entityName {
-    if ([entityName isEqualToString:bUserEntity]) {
-        NSLog(@"Creating: %@", entityName);
-    }
+    id entity = nil;
+
+//    [_mainMoc performBlockAndWait:^{
+        if ([entityName isEqualToString:bUserEntity]) {
+            [BChatSDK.shared.logger log: @"Creating: %@", entityName];
+        }
+        if ([entityName isEqualToString:bThreadEntity]) {
+            [BChatSDK.shared.logger log: @"Creating: %@", entityName];
+        }
+
+        entity = [NSEntityDescription insertNewObjectForEntityForName:entityName
+                                                  inManagedObjectContext:_mainMoc];
+        
+        if ([entityName isEqualToString:bUserEntity]) {
+            [BChatSDK.shared.logger log: @"Creating: %@", entityName];
+        }
+        if ([entityName isEqualToString:bThreadEntity]) {
+    //        CDThread * thread = (CDThread *) entity;
+    //        thread.currentUserEntityID = BChatSDK.currentUserID;
+            [BChatSDK.shared.logger log: @"Creating: %@", entityName];
+        }
+        
+        if ([entity respondsToSelector:@selector(setUserAccountID:)]) {
+            [entity setUserAccountID: BChatSDK.currentUserID];
+        }
+
+    //    SEL selector = NSSelectorFromString(@"setUserAccountID:");
+    //    if ([entity respondsToSelector:selector]) {
+    //        [entity performSelector:selector withObject:BChatSDK.currentUserID];
+    //    }
+//    }];
     
-    id entity = [NSEntityDescription insertNewObjectForEntityForName:entityName
-                                              inManagedObjectContext:self.managedObjectContextForThread];
     return entity;
 }
 
--(bQueueType) queueType {
-    return dispatch_get_specific(kMainQueueKey) ? bQueueTypeMain : bQueueTypeBackground;
-}
-
--(NSManagedObjectContext *) managedObjectContextForThread {
-//    if([NSThread isMainThread]) {
-        return [self managedObjectContext];
-//    } else {
-//        return [self backgroundManagedObjectContext];
-//    }
-    
-//    assert(dispatch_get_specific(kMainQueueKey));
-//    if (dispatch_get_specific(kMainQueueKey)) {
-//        return self.managedObjectContext;
-//    }
-//    else {
-//        NSLog(@"managed object context: %@", [NSThread currentThread]);
-//        return self.backgroundManagedObjectContext;
-//    }
-}
-
-- (NSManagedObjectContext *) privateManagedObjectContext {
-    return _privateMoc;
-}
-
-//- (NSManagedObjectContext *) backgroundManagedObjectContext {
-//    return _backgroundMoc;
-//}
-
-- (NSManagedObjectContext *) managedObjectContext {
-    return _moc;
-}
-
 -(void) beginUndoGroup {
-    [self.managedObjectContextForThread.undoManager beginUndoGrouping];
+    [_mainMoc.undoManager beginUndoGrouping];
 }
 
 -(id<PThread>) threadForEntityID: (NSString *) entityID {
@@ -278,7 +374,7 @@ static void * kMainQueueKey = (void *) "Key1";
 
 
 -(void) undo {
-    [self.managedObjectContextForThread.undoManager undo];
+    [_mainMoc.undoManager undo];
 }
 
 - (NSManagedObjectModel *)managedObjectModel {
@@ -304,11 +400,15 @@ static void * kMainQueueKey = (void *) "Key1";
         _store = [[NSPersistentStoreCoordinator alloc]
                   initWithManagedObjectModel:[self managedObjectModel]];
         
-        NSDictionary * options = @{NSMigratePersistentStoresAutomaticallyOption: @YES, NSInferMappingModelAutomaticallyOption: @YES};
+        NSDictionary * options = @{
+            NSMigratePersistentStoresAutomaticallyOption: @YES,
+            NSInferMappingModelAutomaticallyOption: @YES,
+            NSPersistentStoreFileProtectionKey: NSFileProtectionComplete,
+        };
         
         if(![_store addPersistentStoreWithType:NSSQLiteStoreType
                                  configuration:nil URL:storeUrl options:options error:&error]) {
-            NSLog(@"Error setting up database: %@", error.localizedDescription);
+            [BChatSDK.shared.logger log: @"Error setting up database: %@", error.localizedDescription];
         }
     }
     
@@ -324,7 +424,7 @@ static void * kMainQueueKey = (void *) "Key1";
 }
 
 -(void) endUndoGroup {
-    [self.managedObjectContextForThread.undoManager endUndoGrouping];
+    [_mainMoc.undoManager endUndoGrouping];
 }
 
 -(NSArray *) fetchEntitiesWithTypes: (NSArray *) types {
@@ -349,7 +449,11 @@ static void * kMainQueueKey = (void *) "Key1";
 }
 
 -(void) deleteEntity: (id) entity {
-    [self.managedObjectContextForThread deleteObject:entity];
+    if ([entity isKindOfClass:[CDMessage class]]) {
+        CDMessage * message = (CDMessage *) entity;
+        [message.thread removeMessagesObject:message];
+    }
+    [_mainMoc deleteObject:entity];
 }
 
 -(void) deleteAllData {
@@ -387,65 +491,189 @@ static void * kMainQueueKey = (void *) "Key1";
 }
 
 -(NSArray<PMessage> *) loadMessagesForThread: (id<PThread>) thread fromDate: (NSDate *) date count: (int) count {
-    return [self loadMessagesForThread:thread fromDate:date count:count newestFirst:YES];
+    return [self loadMessagesForThread:thread fromDate:date count:count newestFirst:YES context:_mainMoc];
 }
 
 -(NSArray<PMessage> *) loadAllMessagesForThread: (id<PThread>) thread newestFirst: (BOOL) newestFirst {
-    return [self loadMessagesForThread:thread fromDate:Nil count:0 newestFirst:newestFirst];
+    return [self loadMessagesForThread:thread fromDate:Nil count:0 newestFirst:newestFirst context:_mainMoc];
 }
 
 -(NSArray<PMessage> *) loadMessagesForThread: (id<PThread>) thread newest: (int) count {
-    return [self loadMessagesForThread:thread fromDate:Nil count:count newestFirst:YES];
+    return [self loadMessagesForThread:thread fromDate:Nil count:count newestFirst:YES context:_mainMoc];
 }
 
 -(NSArray<PMessage> *) loadMessagesForThread: (id<PThread>) thread oldest: (int) count {
-    return [self loadMessagesForThread:thread fromDate:Nil count:count newestFirst:NO];
+    return [self loadMessagesForThread:thread fromDate:Nil count:count newestFirst:NO context:_mainMoc];
 }
 
--(NSArray<PMessage> *) loadMessagesForThread: (id<PThread>) thread fromDate: (NSDate *) date count: (int) count newestFirst: (BOOL) newestFirst {
-    NSFetchRequest * request = [[NSFetchRequest alloc] init];
-    request.includesPendingChanges = YES;
-    if (count > 0) {
-        [request setFetchLimit:count];
-    } else if (count < 0) {
-        [request setFetchLimit:BChatSDK.config.messagesToLoadPerBatch];
-    }
+-(NSArray<PMessage> *) loadMessagesForThread: (id<PThread>) thread fromDate: (NSDate *) date count: (int) count newestFirst: (BOOL) newestFirst context: (NSManagedObjectContext *) context {
     
-    request.sortDescriptors = @[[NSSortDescriptor sortDescriptorWithKey:@"date" ascending:!newestFirst]];
+    __block NSArray * messages = @[];
+    
+    [context performBlockAndWait:^{
+        NSFetchRequest * request = [[NSFetchRequest alloc] init];
+        request.includesPendingChanges = YES;
+        if (count > 0) {
+            [request setFetchLimit:count];
+        } else if (count < 0) {
+            [request setFetchLimit:BChatSDK.config.messagesToLoadPerBatch];
+        }
+        
+        request.sortDescriptors = @[[NSSortDescriptor sortDescriptorWithKey:@"date" ascending:!newestFirst]];
+        
+        NSString * currentUserID = BChatSDK.currentUserID;
 
-    NSPredicate * predicate = [NSPredicate predicateWithFormat:@"thread = %@", thread];
-    if (date) {
-        predicate = [NSPredicate predicateWithFormat:@"thread = %@ AND date < %@", thread, date];
-    }
-    
-    NSArray * messages = [BChatSDK.db executeFetchRequest:request
-                                               entityName:bMessageEntity
-                                                predicate:predicate];
+        NSPredicate * predicate = [NSPredicate predicateWithFormat:@"thread = %@ AND userAccountID = %@", thread, currentUserID];
+        if (date) {
+            predicate = [NSPredicate predicateWithFormat:@"thread = %@ AND date < %@ AND userAccountID = %@", thread, date, currentUserID];
+        }
+        
+        messages = [self executeFetchRequest:request
+                                  entityName:bMessageEntity
+                                   predicate:predicate
+                                     context:context];
+    }];
     
     return messages;
 }
+
+//-(void) loadMessagesForThread: (id<PThread>) thread newest: (int) count completion: (CompletionArray) completion {
+//    NSMutableArray * messages = [self loadMessagesForThread:thread fromDate:Nil count:count newestFirst:YES context:_backgroundMoc];
+//    if (completion != nil) {
+//        completion(messages);
+//    }
+//}
+
+-(NSArray *) threadsWithType: (bThreadType) type {
+    __block NSArray * threads = nil;
+    [_mainMoc performBlockAndWait:^{
+        threads = [self threadsWithType:type context:_mainMoc];
+    }];
+    return threads;
+}
+
+-(NSArray *) threadsWithType: (bThreadType) type context: (NSManagedObjectContext *) context {
+    NSFetchRequest * request = [[NSFetchRequest alloc] init];
+    request.includesPendingChanges = YES;
+    request.sortDescriptors = @[[NSSortDescriptor sortDescriptorWithKey:@"creationDate" ascending:false]];
+    
+    NSString * currentUserID = BChatSDK.currentUserID;
+    NSPredicate * predicate;
+    if (type & bThreadFilterPublic) {
+        predicate = [NSPredicate predicateWithFormat:@"type = %@ AND userAccountID = %@", @(bThreadTypePublicGroup), currentUserID];
+    } else {
+        predicate = [NSPredicate predicateWithFormat:@"(type = %@ OR type = %@)  AND (ANY users.entityID = %@) AND userAccountID = %@", @(bThreadType1to1), @(bThreadTypePrivateGroup), currentUserID, currentUserID];
+    }
+    
+    NSArray * threads = [self executeFetchRequest:request
+                                               entityName:bThreadEntity
+                                                predicate:predicate
+                                                  context: context];
+    return threads;
+}
+
+-(void) threadsWithType: (bThreadType) type then: (CompletionArray) completion {
+    [_backgroundMoc performBlock: ^{
+        NSArray * threads = [self threadsWithType:type context:_backgroundMoc];
+        completion(threads);
+    }];
+}
+
+-(RXPromise *) privateThreadUnreadMessageCount {
+    NSString * currentUserEntityID = BChatSDK.currentUserID;
+    NSPredicate * predicate = [NSPredicate predicateWithFormat:@"(thread.type = %@ OR thread.type = %@) AND thread.userAccountID = %@ AND user.entityID != %@ AND (read == NO || read = nil)", @(bThreadType1to1), @(bThreadTypePrivateGroup), currentUserEntityID, currentUserEntityID];
+    return [self unreadMessagesCountWithPredicate:predicate];
+}
+
+-(RXPromise *) publicThreadUnreadMessageCount {
+    NSString * currentUserEntityID = BChatSDK.currentUserID;
+    NSPredicate * predicate = [NSPredicate predicateWithFormat:@"thread.type = %@ AND thread.userAccountID = %@ AND user.entityID != %@ AND (read == NO || read = nil)", @(bThreadTypePublicGroup), currentUserEntityID, currentUserEntityID];
+    return [self unreadMessagesCountWithPredicate:predicate];
+}
+
+-(RXPromise *) unreadMessagesCount: (NSString *) threadEntityID {
+    NSString * currentUserEntityID = BChatSDK.currentUserID;
+    NSPredicate * predicate = [NSPredicate predicateWithFormat:@"thread.entityID = %@ AND thread.userAccountID = %@ AND user.entityID != %@ AND (read == NO || read = nil)", threadEntityID, currentUserEntityID, currentUserEntityID];
+    return [self unreadMessagesCountWithPredicate:predicate];
+}
+
+-(int) unreadMessagesCountNow: (NSString *) threadEntityID {
+    __block int count = 0;
+    [_mainMoc performBlockAndWait:^{
+        NSString * currentUserEntityID = BChatSDK.currentUserID;
+
+        NSPredicate * predicate = [NSPredicate predicateWithFormat:@"thread.entityID = %@ AND thread.userAccountID = %@ AND user.entityID != %@ AND (read == NO || read = nil)", threadEntityID, currentUserEntityID, currentUserEntityID];
+        
+        NSArray * messagesUnread = [self unreadMessagesNowWithPredicate:predicate context:_mainMoc];
+        count = messagesUnread.count;
+
+    }];
+    return count;
+}
+
+-(void) unreadMessages: (NSString *) threadEntityID then: (CompletionArray) completion {
+    NSString * currentUserEntityID = BChatSDK.currentUserID;
+    NSPredicate * predicate = [NSPredicate predicateWithFormat:@"thread.entityID = %@ AND thread.userAccountID = %@ AND user.entityID != %@ AND (read == NO || read = nil)", threadEntityID, currentUserEntityID, currentUserEntityID];
+    return [self unreadMessagesWithPredicate:predicate context:_mainMoc then: completion];
+}
+
+-(void) unreadMessagesCountWithPredicate: (NSPredicate *) predicate then: (CompletionInt) completion {
+    [self unreadMessagesWithPredicate:predicate context:_backgroundMoc then:^(NSArray * messages) {
+        completion(messages.count);
+    }];
+}
+
+-(RXPromise *) unreadMessagesCountWithPredicate: (NSPredicate *) predicate {
+    __block RXPromise * promise = [RXPromise new];
+    [self unreadMessagesCountWithPredicate:predicate then:^(int count){
+        [promise resolveWithResult:@(count)];
+    }];
+    return promise;
+}
+
+-(void) unreadMessagesWithPredicate: (NSPredicate *) predicate context: (NSManagedObjectContext *) context then: (CompletionArray) completion {
+    // Can this be on background? Causes a crash
+    // Maybe put this back on background?
+    // Move to hook or notification
+    [context performBlock: ^{
+        completion([self unreadMessagesNowWithPredicate:predicate context:context]);
+    }];
+}
+
+-(NSArray *) unreadMessagesNowWithPredicate: (NSPredicate *) predicate context: (NSManagedObjectContext *) context {
+    NSFetchRequest * request = [[NSFetchRequest alloc] init];
+    request.includesPendingChanges = YES;
+            
+    NSArray * messages = [self executeFetchRequest:request
+                                               entityName:bMessageEntity
+                                                predicate:predicate
+                                                  context: context];
+
+    return messages;
+}
+
 
 /// https://stackoverflow.com/questions/36338135/nsmanagedobjectcontext-how-to-update-child-when-parent-changes
 /// I need this firing as sometimes objects change and the save notification below is not enough to make sure the UI updates.
 - (void)privateQueueObjectContextDidChangeNotification:(NSNotification *)notification {
     NSManagedObjectContext * context = notification.object;
     
-    NSManagedObjectContext * parent = self.privateManagedObjectContext;
+//    NSManagedObjectContext * parent = _parentMoc;
 //    NSManagedObjectContext * background = self.backgroundManagedObjectContext;
-    NSManagedObjectContext * main = self.managedObjectContext;
+    NSManagedObjectContext * main = _mainMoc;
 
-    if([context isEqual:parent]) {
+//    if([context isEqual:parent]) {
 //        NSLog(@"Parent");
-    }
+//    }
 //    else if([context isEqual:background]) {
 //        NSLog(@"Background");
 //    }
-    else if([context isEqual:main]) {
+//    else if([context isEqual:main]) {
 //        NSLog(@"Main");
-    }
-    else {
+//    }
+//    else {
 //        NSLog(@"None");
-    }
+//    }
     
     id updated = notification.userInfo[@"updated"];
     if ([updated isKindOfClass:[NSSet class]]) {

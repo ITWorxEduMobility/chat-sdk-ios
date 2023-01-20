@@ -8,19 +8,10 @@
 #import <Foundation/Foundation.h>
 
 @interface BModuleHelper : NSObject {
-    NSMutableArray * _excludingModules;
-    NSMutableArray * _activated;
 }
 
 // Acivate the core Chat SDK modules
 -(void) activateCoreModules;
--(BOOL) activateModuleForName: (NSString *) name;
-
-// Activate the optional modules
--(void) activateModules;
--(void) activateModulesForFirebase;
--(void) activateModulesForXMPP;
-
--(void) excludeModules: (NSArray *) modules;
+-(void) activateUIModule;
 
 @end

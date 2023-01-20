@@ -26,14 +26,15 @@
 @class BHook;
 @class BMessageManager;
 @class BLazyReloadManager;
-@class ChatToolbar;
-@class ReplyView;
+@class BChatToolbar;
+@class BReplyView;
+@class BChatHeaderView;
 
 @interface ElmChatViewController : UIViewController<UITableViewDataSource, UITableViewDelegate, PSendBarDelegate, UINavigationControllerDelegate, UIScrollViewDelegate, BChatOptionDelegate, UIDocumentInteractionControllerDelegate> {
         
     UIView<PSendBar> * _sendBarView;
-    ChatToolbar * _chatToolbar;
-    ReplyView * _replyView;
+    BChatToolbar * _chatToolbar;
+    BReplyView * _replyView;
     
     UIGestureRecognizer * _tapRecognizer;
     UIGestureRecognizer * _longPressRecognizer;
@@ -49,8 +50,6 @@
     // Typing Indicator
     NSTimer * _typingTimer;
 
-    UILabel * _titleLabel;
-    UILabel * _subtitleLabel;
     NSString * _subtitleText;
 
     bChatState _chatState;
@@ -70,15 +69,19 @@
     BLazyReloadManager * _lazyReloadManager;
     
     NSMutableArray * _selectedIndexPaths;
+    
+    BChatHeaderView * _headerView;
+    
 }
 
 @property (weak, nonatomic) IBOutlet UITableView * tableView;
 @property (nonatomic, readwrite, weak) id<ElmChatViewDelegate> delegate;
 @property (nonatomic, readonly) UIView<PSendBar> * sendBarView;
-@property (nonatomic, readonly) UILabel * titleLabel;
+//@property (nonatomic, readonly) UILabel * titleLabel;
 @property (nonatomic, readonly) BMessageManager * messageManager;
+@property (nonatomic, readwrite) BChatHeaderView * headerView;
 
--(instancetype) initWithDelegate: (id<ElmChatViewDelegate>) delegate;
+-(instancetype) initWithDelegate: (id<ElmChatViewDelegate>) delegate_ nibName:(nullable NSString *)nibNameOrNil bundle:(nullable NSBundle *)nibBundleOrNil;
 
 -(void) setTitle: (NSString *) title;
 -(void) setSubtitle: (NSString *) subtitle;
@@ -86,7 +89,6 @@
 -(void) startTypingWithMessage: (NSString *) message;
 -(void) stopTyping;
 
--(void) addMessages: (NSArray<PMessage> *) messages;
 -(void) addMessages: (NSArray<PMessage> *) messages;
 -(void) addMessage: (id<PMessage>) message;
 
@@ -109,11 +111,11 @@
 
 -(void) keyboardWillShow: (NSNotification *) notification;
 -(void) keyboardWillHide: (NSNotification *) notification;
+-(void) keyboardDidHide: (NSNotification *) notification;
 
 -(void) setupTextInputView: (BOOL) forceSuper;
--(void) clearSelection;
--(void) setupChatToolbar;
--(void) setupReplyView;
 
+-(void) reloadData: (BOOL) scroll animate: (BOOL) animate force: (BOOL) force;
+-(void) setReadOnly: (BOOL) readOnly;
 
 @end

@@ -44,34 +44,17 @@
     NSArray * vcs = [BChatSDK.ui tabBarNavigationViewControllers];
     self.viewControllers = vcs;
     [self.tabBar setTranslucent:NO];
+//    self.tabBar.tintColor = UIColor.systemBackgroundColor;
+//    self.tabBar.barTintColor = UIColor.redColor;
+    self.tabBar.backgroundColor = UIColor.systemBackgroundColor;
 
-    [BChatSDK.hook addHook:[BHook hook:^(NSDictionary * data) {
+    [self.navigationController setNavigationBarHidden:YES];
+    self.navigationController.toolbarHidden = YES;
+
+    [BChatSDK.hook addHook:[BHook hookOnMain:^(NSDictionary * data) {
         [self setSelectedIndex:0];
     }] withName:bHookDidLogout];
-    
-    [BChatSDK.hook addHook:[BHook hook:^(NSDictionary * data) {
-        [weakSelf updateBadge];
-    }] withNames:@[bHookMessageRecieved, bHookMessageWasDeleted, bHookAllMessagesDeleted]];
-
-    // When a message is recieved we increase the messages tab number
-    [[NSNotificationCenter defaultCenter] addObserverForName:bNotificationBadgeUpdated object:Nil queue:Nil usingBlock:^(NSNotification * notification) {
-        dispatch_async(dispatch_get_main_queue(), ^{
-            [weakSelf updateBadge];
-        });
-    }];
-    
-    [[NSNotificationCenter defaultCenter] addObserverForName:bNotificationThreadRead object:Nil queue:Nil usingBlock:^(NSNotification * notification) {
-        dispatch_async(dispatch_get_main_queue(), ^{
-            [weakSelf updateBadge];
-        });
-    }];
-    
-    [BChatSDK.hook addHook:[BHook hook:^(NSDictionary * dict) {
-        dispatch_async(dispatch_get_main_queue(), ^{
-            [weakSelf updateBadge];
-        });
-    }] withNames: @[bHookThreadAdded, bHookThreadRemoved]];
-    
+        
     [[NSNotificationCenter defaultCenter] addObserverForName:bNotificationPresentChatView object:Nil queue:Nil usingBlock:^(NSNotification * notification) {
         dispatch_async(dispatch_get_main_queue(), ^{
             // Only run this code if this view is visible
@@ -84,8 +67,15 @@
         });
     }];
     
-    NSInteger badge = [[NSUserDefaults standardUserDefaults] integerForKey:bMessagesBadgeValueKey];
-    [self setPrivateThreadsBadge:badge];
+    [BChatSDK.hook addHook:[BHook hookOnMain:^(NSDictionary * dict) {
+        NSString * title = dict[bHook_TitleString];
+        NSString * message = dict[bHook_MessageString];
+        
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:title message:message preferredStyle:UIAlertControllerStyleAlert];
+        [alert addAction:[UIAlertAction actionWithTitle:[NSBundle t:bOk] style:UIAlertActionStyleCancel handler:nil]];
+        [self.selectedViewController presentViewController:alert animated:YES completion:nil];
+        
+    }] withName:bHookGlobalAlertMessage];
     
 }
 
@@ -94,6 +84,7 @@
         // Set the tab to the private threads screen
         NSArray * vcs = [BChatSDK.ui tabBarViewControllers];
         NSInteger index = [vcs indexOfObject:BChatSDK.ui.privateThreadsViewController];
+        
         
         if(index != NSNotFound) {
             [self setSelectedIndex:index];
@@ -113,8 +104,6 @@
 
 -(void) viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
-    [self updateBadge];
-    [BChatSDK.core save];
 }
 
 -(void) viewDidAppear:(BOOL)animated {
@@ -131,82 +120,33 @@
         }
     }
     
-    [self updateBadge];
+    [BChatSDK.ui setLocalNotificationHandler:^(id<PThread> thread) {
+        return NO;
+    }];
+    [self updateShowLocalNotifications:self.selectedViewController];
+
+    [BChatSDK.core save];
+}
+
+-(void) updateShowLocalNotifications: (UIViewController *) viewController {
+    if ([viewController isKindOfClass:[UINavigationController class]]) {
+        UINavigationController * nav = (UINavigationController *) viewController;
+        if (nav.viewControllers.count) {
+            if ([nav.viewControllers.firstObject respondsToSelector:@selector(updateLocalNotificationHandler)]) {
+                [nav.viewControllers.firstObject performSelector:@selector(updateLocalNotificationHandler)];
+            } else {
+                [BChatSDK.ui setLocalNotificationHandler:^(id<PThread> thread) {
+                    return YES;
+                }];
+            }
+        }
+    }
 }
 
 // If the user changes tab they must be online
 - (void)tabBarController:(UITabBarController *)tabBarController didSelectViewController:(UIViewController *)viewController {
-    [BChatSDK.core setUserOnline];
     [BChatSDK.core save];
-    
-    if ([viewController isKindOfClass:[UINavigationController class]]) {
-        UINavigationController * nav = (UINavigationController *) viewController;
-        if (nav.viewControllers.count) {
-            // Should we enable or disable local notifications? We want to show them on every tab that isn't the thread view
-            BOOL showNotification = ![nav.viewControllers.firstObject isEqual:BChatSDK.ui.privateThreadsViewController] && ![nav.viewControllers.firstObject isEqual:BChatSDK.ui.publicThreadsViewController];
-            
-            [BChatSDK.ui setLocalNotificationHandler:^(id<PThread> thread) {
-                return showNotification;
-            }];
-
-            return;
-        }
-    }
-    
-    [BChatSDK.ui setLocalNotificationHandler:^(id<PThread> thread) {
-        return NO;
-    }];
-}
-
--(void) updateBadge {
-    
-    // The message view open with this thread?
-    // Get the number of unread messages
-    int privateThreadsMessageCount = [self unreadMessagesCount:bThreadFilterPrivate];
-    [self setPrivateThreadsBadge:privateThreadsMessageCount];
-
-    if(BChatSDK.config.showPublicThreadsUnreadMessageBadge) {
-        int publicThreadsMessageCount = [self unreadMessagesCount:bThreadFilterPublic];
-        [self setBadge:publicThreadsMessageCount forViewController:BChatSDK.ui.publicThreadsViewController];
-    }
-    
-    [BChatSDK.core save];
-}
-
--(int) unreadMessagesCount: (bThreadType) type {
-    // Get all the threads
-    int i = 0;
-    NSArray * threads = [BChatSDK.thread threadsWithType:type];
-    for (id<PThread> thread in threads) {
-        for (id<PMessage> message in thread.allMessages) {
-            if (!message.isRead) {
-                i++;
-            }
-        }
-    }
-    return i;
-}
-
-// TODO - move this to a more appropriate place in the code
--(void) setBadge: (int) badge forViewController: (UIViewController *) controller {
-    NSInteger index = [BChatSDK.ui.tabBarViewControllers indexOfObject:controller];
-    if (index != NSNotFound) {
-        // Using self.tabbar will correctly set the badge for the specific index
-        NSString * badgeString = badge == 0 ? Nil : [NSString stringWithFormat:@"%i", badge];
-        [self.tabBar.items objectAtIndex:index].badgeValue = badgeString;
-    }
-}
-
--(void) setPrivateThreadsBadge: (NSInteger) badge {
-    [self setBadge:badge forViewController:BChatSDK.ui.privateThreadsViewController];
-    
-    // Save the value to defaults
-    [[NSUserDefaults standardUserDefaults] setInteger:badge forKey:bMessagesBadgeValueKey];
-    [[NSUserDefaults standardUserDefaults] synchronize];
-    
-    if ([BChatSDK.config appBadgeEnabled]) {
-        [UIApplication sharedApplication].applicationIconBadgeNumber = badge;
-    }
+    [self updateShowLocalNotifications:viewController];
 }
 
 -(NSBundle *) uiBundle {

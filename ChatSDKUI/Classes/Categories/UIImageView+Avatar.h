@@ -10,10 +10,16 @@
 NS_ASSUME_NONNULL_BEGIN
 
 @protocol PUser;
+@protocol PElmUser;
+@protocol PThread;
 
 @interface UIImageView(Avatar)
 
--(void) loadAvatar: (id<PUser>) user;
+-(void) loadAvatar: (id<PElmUser>) user;
+-(UIImage *) userDefaultImage;
+-(void) setDefaultUserImage;
+-(void) loadThreadImage: (id<PThread>) thread;
++(NSString * _Nullable) threadImageURL: (id<PThread>) thread;
 
 @end
 

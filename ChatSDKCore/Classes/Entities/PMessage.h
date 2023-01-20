@@ -11,6 +11,7 @@
 #import "bMessageStatus.h"
 
 typedef enum {
+    bMessageTypeNone = -2,
     bMessageTypeAll = -1,
     bMessageTypeText = 0,
     bMessageTypeLocation = 1,
@@ -20,6 +21,11 @@ typedef enum {
     bMessageTypeSystem = 5,
     bMessageTypeSticker = 6,
     bMessageTypeFile = 7,
+    bMessageTypeBase64Image = 8,
+    bMessageTypeSnap = 9,
+    bMessageTypeContact = 10,
+    bMessageTypeGif = 11,
+    bMessageTypeSilent = 98,
     bMessageTypeCustom = 99,
 } bMessageType;
 
@@ -30,6 +36,22 @@ typedef enum {
     bMessagePosSingle = bMessagePosFirst | bMessagePosLast,
 } bMessagePos;
 
+typedef enum {
+    bMessageActionNone = -1,
+    bMessageActionUserLeftGroup = 1,
+    bMessageActionUserGroupInvite = 2,
+    bMessageActionUserJoinedGroup = 3,
+} bMessageAction;
+
+typedef enum {
+    bMessageSendStatusNone = 0,
+    bMessageSendStatusWillSend = 10,
+    bMessageSendStatusSending = 20,
+    bMessageSendStatusSent = 30,
+    bMessageSendStatusFailed = 40,
+} bMessageSendStatus;
+
+
 #define bMessageText @"text"
 
 // We need the key here so it doesn't clash with the enum
@@ -38,19 +60,23 @@ typedef enum {
 #define bMessageImageURL @"image-url"
 
 #define bMessageImageWidth @"image-width"
+#define bMessageImageData @"image-data"
 #define bMessageImageHeight @"image-height"
 #define bMessageVideoURL @"video-url"
+#define bMessageSize @"size"
 #define bMessageFileURL @"file-url"
 #define bMessageMimeType @"mime-type"
+#define bMessageImagePreview @"image-preview"
 
 #define bMessageLongitude @"longitude"
 #define bMessageLatitude @"latitude"
 #define bMessageAudioURL @"audio-url"
 #define bMessageAudioLength @"audio-length"
+#define bMessageEncryptedPayloadKey @"encrypted-message"
 
 #define bMessageSystemType @"system-type"
 
-#define bMessageOriginalThreadEntityID @"original-thread-entity-id"
+#define bMessageIsHistoric @"historic"
 
 typedef enum {
     bSystemMessageTypeInfo = 1,
@@ -140,10 +166,17 @@ typedef enum {
 
 @optional
 
+-(BOOL) sendFailed;
+-(bMessageSendStatus) messageSendStatus;
+-(void) setMessageSendStatus: (bMessageSendStatus) status;
+
 -(void) setReadStatus:(NSDictionary *)status;
--(void) setReadStatus: (bMessageReadStatus) status_ forUserID: (NSString *) uid;
+-(BOOL) setReadStatus: (bMessageReadStatus) status_ forUserID: (NSString *) uid date: (NSDate *) date;
+-(BOOL) setReadStatus: (bMessageReadStatus) status_ forUserID: (NSString *) uid;
 -(bMessageReadStatus) readStatusForUserID: (NSString *) uid;
 -(bMessageReadStatus) messageReadStatus;
 -(void) setMetaValue: (id) value forKey: (NSString *) key;
+-(void) setupInitialReadReceipts;
+-(void) setReadReceiptsTo: (bMessageReadStatus) status;
 
 @end

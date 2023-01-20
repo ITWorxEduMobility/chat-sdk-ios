@@ -16,6 +16,9 @@ import Foundation
 
     var userProfileSections = [ProfileSection]()
 
+    public override init() {
+    }
+    
     @objc public func addUserProfileSection(section: ProfileSection) {
         userProfileSections.append( section)
     }

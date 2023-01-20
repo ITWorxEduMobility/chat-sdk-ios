@@ -32,7 +32,7 @@
     [super viewDidLoad];
     
     NSOperatingSystemVersion version = [[NSProcessInfo processInfo] operatingSystemVersion];
-    if (version.majorVersion < 13) {
+    if (version.majorVersion < 13 || BChatSDK.config.alwaysShowBackButtonOnModalViews) {
         self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:[NSBundle t:bBack] style:UIBarButtonItemStylePlain target:self action:@selector(backButtonPressed)];
     }
     
@@ -43,7 +43,7 @@
 -(void) viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
     
-    _map = [BMapViewManager sharedManager].mapFromPool;
+    _map = [BMapViewManager shared].mapFromPool;
     [self.view addSubview:_map.mapView];
     
     _map.mapView.keepInsets.equal = 0;
@@ -60,7 +60,7 @@
 }
 
 -(void) viewWillDisappear:(BOOL)animated {
-    [[BMapViewManager sharedManager] returnToPool:_map];
+    [[BMapViewManager shared] returnToPool:_map];
 }
 
 -(void) backButtonPressed {

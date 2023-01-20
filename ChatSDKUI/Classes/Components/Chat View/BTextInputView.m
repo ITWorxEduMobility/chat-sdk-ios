@@ -35,7 +35,9 @@
     self = [super initWithFrame:frame];
     if (self) {
         
-//        self.barTintColor = [UIColor colorWithRed:1 green:1 blue:1 alpha:0.7];
+        _readOnly = false;
+
+        //        self.barTintColor = [UIColor colorWithRed:1 green:1 blue:1 alpha:0.7];
         
         if (@available(iOS 13.0, *)) {
             self.backgroundColor = [UIColor systemBackgroundColor];
@@ -141,11 +143,15 @@
         [self setFont:[UIFont systemFontOfSize:bFontSize]];
         
         __weak __typeof__(self) weakSelf = self;
-        _internetConnectionHook = [BHook hook:^(NSDictionary * data) {
-            __typeof__(self) strongSelf = weakSelf;
-            [strongSelf updateInterfaceForReachabilityStateChange];
+        _internetConnectionHook = [BHook hookOnMain:^(NSDictionary * data) {
+            [weakSelf updateInterfaceForReachabilityStateChange];
         }];
         [BChatSDK.hook addHook:_internetConnectionHook withName:bHookInternetConnectivityDidChange];
+
+        _connectionStatusHook = [BHook hookOnMain:^(NSDictionary * data) {
+            [weakSelf updateInterfaceForReachabilityStateChange];
+        }];
+        [BChatSDK.hook addHook:_connectionStatusHook withName:bHookServerConnectionStatusUpdated];
         
         [self updateInterfaceForReachabilityStateChange];
         
@@ -171,9 +177,19 @@
 }
 
 -(void) updateInterfaceForReachabilityStateChange {
-    BOOL connected = BChatSDK.connectivity.isConnected;
-    _sendButton.enabled = connected;
-    _optionsButton.enabled = connected;
+    _sendButton.enabled = self.isConnected && !_readOnly;
+    _optionsButton.enabled = self.isConnected && !_readOnly;
+}
+
+-(BOOL) isConnected {
+    BOOL connected = YES;
+    if (BChatSDK.config.disableSendButtonWhenNotReachable) {
+        connected = connected && BChatSDK.connectivity.isConnected;
+    }
+    if (BChatSDK.config.disableSendButtonWhenDisconnected) {
+        connected = connected && (BChatSDK.core.connectionStatus == bConnectionStatusConnected || BChatSDK.core.connectionStatus == bConnectionStatusNone);
+    }
+    return connected;
 }
 
 -(void) setAudioEnabled: (BOOL) audioEnabled {
@@ -186,8 +202,8 @@
 }
 
 -(void) setMicButtonEnabled: (BOOL) enabled sendButtonEnabled: (BOOL) sendButtonEnabled {
-    _micButtonEnabled = enabled;
-    _sendButton.enabled = sendButtonEnabled || enabled;
+    _micButtonEnabled = enabled && self.isConnected;
+    _sendButton.enabled = (sendButtonEnabled || enabled) && self.isConnected && !_readOnly;
     if (enabled) {
         [_sendButton setTitle:Nil forState:UIControlStateNormal];
         [_sendButton setImage:[NSBundle uiImageNamed: @"icn_24_mic"]
@@ -231,12 +247,14 @@
 // When the button is held we start recording
 - (void)sendButtonHeld {
     if (_micButtonEnabled) {
-        [[BAudioManager sharedManager] startRecording];
-        _recordingToastTimer = [NSTimer scheduledTimerWithTimeInterval:0.5
-                                                                target:self
-                                                              selector:@selector(showRecordingToast)
-                                                              userInfo:Nil
-                                                               repeats:YES];
+        [[BAudioManager shared] startRecording];
+        
+        __weak __typeof(self) weakSelf = self;
+        _recordingToastTimer = [NSTimer scheduledTimerWithTimeInterval:0.5 repeats:YES block:^(NSTimer * timer) {
+            __typeof(self) strongSelf = weakSelf;
+            [strongSelf showRecordingToast];
+        }];
+
         _recordingStart = [NSDate new];
         [_placeholderLabel setText:[NSBundle t: bSlideToCancel]];
     }
@@ -247,9 +265,9 @@
     if (_sendBarDelegate) {
         
         // Return the recording url and duration in an array
-        NSURL * audioURL = [BAudioManager sharedManager].recorder.url;
+        NSURL * audioURL = [BAudioManager shared].recorder.url;
         NSData * audioData = [NSData dataWithContentsOfURL:audioURL];
-        double duration = [BAudioManager sharedManager].recordingLength;
+        double duration = [BAudioManager shared].recordingLength;
         
         if (duration > 1) {
             [BChatSDK.audioMessage sendMessageWithAudio:audioData duration:duration withThreadEntityID:_sendBarDelegate.threadEntityID];
@@ -283,7 +301,7 @@
 }
 
 -(void) stopRecording {
-    [[BAudioManager sharedManager] finishRecording];
+    [[BAudioManager shared] finishRecording];
     [_sendBarDelegate.view hideAllToasts];
     [_placeholderLabel setText:[NSBundle t:bWriteSomething]];
     [self cancelRecordingToastTimer];
@@ -334,7 +352,7 @@
                             duration:1
                             position:[NSValue valueWithCGPoint: CGPointMake(_sendBarDelegate.view.frame.size.width / 2.0, self.frame.origin.y - self.frame.size.height - 20)] style:style];
     [self cancelRecordingToastTimer];
-    [[BAudioManager sharedManager] finishRecording];
+    [[BAudioManager shared] finishRecording];
 }
 
 -(void) optionsButtonPressed {
@@ -542,6 +560,16 @@
 
 -(void) setSendBarDelegate:(id<PSendBarDelegate>)delegate {
     _sendBarDelegate = delegate;
+}
+
+-(void) setReadOnly: (BOOL) readonly {
+    _readOnly = readonly;
+    
+    _optionsButton.enabled = !readonly;
+    _textView.userInteractionEnabled = !readonly;
+    _placeholderLabel.hidden = readonly;
+    _sendButton.enabled = !readonly;
+    
 }
 
 @end

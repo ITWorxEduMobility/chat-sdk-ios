@@ -11,6 +11,12 @@
 
 @implementation BAbstractAuthenticationHandler
 
+-(instancetype) init {
+    if((self = [super init])) {
+    }
+    return self;
+}
+
 -(BOOL) accountTypeEnabled: (bAccountType) accountType {
     NSString * key = @"";
     
@@ -24,11 +30,15 @@
 }
 
 -(BOOL) isAuthenticatedThisSession {
-    return _authenticatedThisSession && self.userAuthenticated;
+    return _isAuthenticatedThisSession && self.isAuthenticated;
 }
 
--(BOOL) userAuthenticatedThisSession __deprecated {
-    return [self isAuthenticatedThisSession];
+-(id<PUser>) currentUser {
+    NSString * currentUserID = _currentUserID;
+    if (currentUserID && (!_currentUser || !_currentUser.entityID)) {
+        _currentUser = [BChatSDK.db fetchEntityWithID:currentUserID withType:bUserEntity];
+    }
+    return _currentUser;
 }
 
 -(RXPromise *) authenticateWithDictionary:(NSDictionary *)details {
@@ -59,39 +69,28 @@
     }
 }
 
--(NSString *) currentUserEntityID {
-    return [[NSUserDefaults standardUserDefaults] dictionaryForKey:bCurrentUserLoginInfo][bAuthenticationIDKey];
+-(NSString *) currentUserID {
+    if (!_currentUserID) {
+        _currentUserID = [[NSUserDefaults standardUserDefaults] stringForKey: bAuthenticationIDKey];
+    }
+    return _currentUserID;
 }
 
--(void) saveAccountDetails: (BAccountDetails *) details {
-    [self setLoginInfo:@{bLoginUsernameKey: details.username,
-                         bLoginPasswordKey: details.password}];
-}
-
--(BAccountDetails *) getSavedAccountDetails {
-    return [BAccountDetails username:self.loginInfo[bLoginUsernameKey] password:self.loginInfo[bLoginPasswordKey]];
-}
-
--(void) setLoginInfo: (NSDictionary *) info {
-    [[NSUserDefaults standardUserDefaults] setObject:info forKey:bCurrentUserLoginInfo];
+-(void) setCurrentUserID: (NSString *) currentUserID {
+    [[NSUserDefaults standardUserDefaults] setObject:currentUserID forKey:bAuthenticationIDKey];
     [[NSUserDefaults standardUserDefaults] synchronize];
 }
 
--(NSDictionary *) loginInfo {
-    return [[NSUserDefaults standardUserDefaults] dictionaryForKey:bCurrentUserLoginInfo];
+-(void) clearCurrentUserID {
+    _currentUser = nil;
+    _currentUserID = Nil;
+    [[NSUserDefaults standardUserDefaults] removeObjectForKey:bAuthenticationIDKey];
+    [[NSUserDefaults standardUserDefaults] synchronize];
 }
 
 /**
  * @brief Authenticate with Firebase
  */
-
-/**
- * @brief Checks whether the user has been authenticated this session
- */
--(BOOL) userAuthenticated __deprecated {
-    return [self isAuthenticated];
-}
-
 -(BOOL) isAuthenticated {
     assert(NO);
 }
@@ -100,15 +99,9 @@
  * @brief Logout the user from the current account
  */
 -(RXPromise *) logout {
-    assert(NO);
-}
-
-/**
- * @brief Check to see if the user is already authenticated
- * @deprecated Use authenticate
- */
--(RXPromise *) authenticateWithCachedToken __deprecated {
-    return [self authenticate];
+    _isAuthenticatedThisSession = false;
+    [self clearCurrentUserID];
+    return [RXPromise resolveWithResult:Nil];
 }
 
 /**

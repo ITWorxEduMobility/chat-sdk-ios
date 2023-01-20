@@ -16,9 +16,9 @@ public class QRCodeViewController: UIViewController {
     @IBOutlet weak var textView: UITextView!
     @IBOutlet weak var copyButton: UIImageView!
     
-    var qrImage: UIImage?
-    var style: UIImage?
-    var code: String?
+    @objc public var qrImage: UIImage?
+    @objc public var style: UIImage?
+    @objc public var code: String?
     
     public init(image: UIImage?) {
         super.init(nibName: "QRCodeViewController", bundle: Bundle.ui())
@@ -35,7 +35,7 @@ public class QRCodeViewController: UIViewController {
     
     @objc public func setCode(code: String) {
         self.code = code
-        if let image = EFQRCode.generate(content: code, watermark: style?.cgImage ?? BChatSDK.config()?.logoImage?.cgImage) {
+        if let image = EFQRCode.generate(content: code, watermark: style?.cgImage) {
             qrImage = UIImage(cgImage: image)
         }
     }
@@ -44,6 +44,18 @@ public class QRCodeViewController: UIViewController {
         super.viewDidLoad()
         qrCodeImageView.image = qrImage
         textView.text = code
+        
+        let version = ProcessInfo.processInfo.operatingSystemVersion;
+        if (version.majorVersion < 13 || BChatSDK.config().alwaysShowBackButtonOnModalViews) {
+            navigationItem.leftBarButtonItem = UIBarButtonItem(title: Bundle.t(bBack), style: .plain, target: self, action: #selector(back))
+        }
+        
+        textView.isUserInteractionEnabled = false
+
+    }
+    
+    @objc public func back() {
+        dismiss(animated: true, completion: nil)
     }
     
     @IBAction func copyButtonPressed(_ sender: Any) {

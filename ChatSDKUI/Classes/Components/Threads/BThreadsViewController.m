@@ -12,6 +12,7 @@
 
 #import <ChatSDK/Core.h>
 #import <ChatSDK/UI.h>
+#import <ChatSDK/ChatSDK-Swift.h>
 
 #define bCellIdentifier @"bCellIdentifier"
 
@@ -30,7 +31,8 @@
     if (self) {
         _threads = [NSMutableArray new];
         _threadTypingMessages = [NSMutableDictionary new];
-        _notificationList = [BNotificationObserverList new];
+        _disposeOnDisappear = [BNotificationObserverList new];
+        _disposeOnDealloc = [BNotificationObserverList new];
     }
     return self;
 }
@@ -58,6 +60,13 @@
     
     [tableView registerNib:[UINib nibWithNibName:@"BThreadCell" bundle:[NSBundle uiBundle]] forCellReuseIdentifier:bCellIdentifier];
     
+    self.navigationItem.titleView = [BReconnectingView new];
+    
+    __weak __typeof(self) weakSelf = self;
+    [_disposeOnDealloc add:[BChatSDK.hook addHook:[BHook hookOnMain:^(NSDictionary * data) {
+        [weakSelf updateBadge];
+    }] withNames:@[bHookMessageRecieved, bHookMessageWasDeleted, bHookAllMessagesDeleted, bHookThreadRemoved]]];
+
 }
 
 -(void) addObservers {
@@ -66,7 +75,7 @@
     
     NSNotificationCenter *nc = [NSNotificationCenter defaultCenter];
 
-    [_notificationList add:[BChatSDK.hook addHook:[BHook hook:^(NSDictionary * dict) {
+    [_disposeOnDisappear add:[BChatSDK.hook addHook:[BHook hookOnMain:^(NSDictionary * dict) {
         id<PMessage> messageModel = dict[bHook_PMessage];
         [messageModel setDelivered:@YES];
         
@@ -79,46 +88,48 @@
             }
         }
         
-        // Move thread to top
-        [weakSelf reloadData];
+        // Just reload that thread
+        [weakSelf sortAndReloadData];
     }] withNames: @[bHookMessageWillSend, bHookMessageRecieved]]];
 
-    [_notificationList add:[BChatSDK.hook addHook:[BHook hook:^(NSDictionary * dict) {
-        [self reloadData];
-    }] withNames: @[bHookMessageWasDeleted, bHookAllMessagesDeleted]]];
+    [_disposeOnDisappear add:[BChatSDK.hook addHook:[BHook hookOnMain:^(NSDictionary * dict) {
+        [weakSelf sortAndReloadData];
+    }] withNames: @[bHookMessageWasDeleted, bHookAllMessagesDeleted, bHookUserUpdated]]];
     
-    [_notificationList add:[nc addObserverForName:bNotificationUserUpdated
-                                           object:Nil
-                                            queue:Nil
-                                       usingBlock:^(NSNotification * notification) {
-                                           dispatch_async(dispatch_get_main_queue(), ^{
-                                               [weakSelf reloadData];
-                                           });
-                                       }]];
-    
-    [_notificationList add:[BChatSDK.hook addHook:[BHook hook:^(NSDictionary * data) {
+    [_disposeOnDisappear add:[BChatSDK.hook addHook:[BHook hookOnMain:^(NSDictionary * data) {
         [weakSelf updateButtonStatusForInternetConnection];
     }] withName:bHookInternetConnectivityDidChange]];
+
+    [_disposeOnDisappear add:[BChatSDK.hook addHook:[BHook hookOnMain:^(NSDictionary * data) {
+        id<PThread> thread = data[bHook_PThread];
+        _threadTypingMessages[thread.entityID] = data[bHook_NSString];
+        [weakSelf reloadDataForThread:thread];
+    }] withName:bHookTypingStateUpdated]];
     
-    [_notificationList add:[nc addObserverForName:bNotificationTypingStateChanged
-                                           object:nil
-                                            queue:Nil
-                                       usingBlock:^(NSNotification * notification) {
-                                           dispatch_async(dispatch_get_main_queue(), ^{
-                                               id<PThread> thread = notification.userInfo[bNotificationTypingStateChangedKeyThread];
-                                               _threadTypingMessages[thread.entityID] = notification.userInfo[bNotificationTypingStateChangedKeyMessage];
-                                               [weakSelf reloadData];
-                                           });
-                                       }]];
-    
-    [_notificationList add:[BChatSDK.hook addHook:[BHook hook:^(NSDictionary * dict) {
-        [self reloadData];
-    }] withNames: @[bHookThreadAdded, bHookThreadRemoved]]];
+    [_disposeOnDisappear add:[BChatSDK.hook addHook:[BHook hookOnMain:^(NSDictionary * dict) {
+        [weakSelf loadThreadsAndReloadData];
+    }] withNames: @[bHookThreadAdded, bHookThreadRemoved, bHookThreadsUpdated]]];
+
+    [_disposeOnDisappear add:[BChatSDK.hook addHook:[BHook hookOnMain:^(NSDictionary * dict) {
+        id<PThread> thread = dict[bHook_PThread];
+        if (thread) {
+            [weakSelf reloadDataForThread:thread];
+        }
+    }] withNames: @[bHookThreadUpdated]]];
+
+    // If we update the badge by message carbon i.e. if the message is read on another active device
+    [_disposeOnDisappear add:[BChatSDK.hook addHook:[BHook hookOnMain:^(NSDictionary * data) {
+        id<PMessage> message = data[bHook_PMessage];
+        if (message) {
+            [weakSelf reloadDataForThread:message.thread];
+            [weakSelf updateBadge];
+        }
+    }] withNames:@[bHookMessageReadReceiptUpdated]]];
 
 }
 
 -(void) removeObservers {
-    [_notificationList dispose];
+    [_disposeOnDisappear dispose];
 }
 
 -(void) createThread {
@@ -137,9 +148,18 @@
     // Stop the typing text from being frozen
     [_threadTypingMessages removeAllObjects];
     
-    [self reloadData];
+    [self loadThreadsAndReloadData];
+    
+    [self updateLocalNotificationHandler];
+    
+    // Update the badge
+    [self updateBadge];
+    
 }
 
+-(void) updateLocalNotificationHandler {
+    // Should  be overridden
+}
 
 -(void) viewWillDisappear:(BOOL)animated {
     [super viewWillDisappear:animated];
@@ -172,54 +192,15 @@
     
     id<PThread> thread = _threads[indexPath.row];
     
-    NSDate * threadDate = thread.orderDate;
+    [cell bind: thread];
     
     NSString * text = @"";// [NSBundle t:bNoMessages];
-    
+
     id<PMessage> newestMessage = thread.newestMessage;
     if (newestMessage) {
         text = [NSBundle textForMessage:newestMessage];
     }
-    
-    if (threadDate) {
-        cell.dateLabel.text = threadDate.threadTimeAgo;
-    }
-    else {
-        cell.dateLabel.text = @"";
-    }
-    
-    if(BChatSDK.config.threadTimeFont) {
-        cell.dateLabel.font = BChatSDK.config.threadTimeFont;
-    }
-    
-    if(BChatSDK.config.threadTitleFont) {
-        cell.titleLabel.font = BChatSDK.config.threadTitleFont;
-    }
-    
-    if(BChatSDK.config.threadSubtitleFont) {
-        cell.messageTextView.font = BChatSDK.config.threadSubtitleFont;
-    }
-    
-    cell.titleLabel.text = thread.displayName ? thread.displayName : [NSBundle t: bDefaultThreadName];
-    
-    NSString * threadImagePath = [thread.meta metaValueForKey:bImageURL];
-    NSURL * threadURL = threadImagePath && threadImagePath.length ? [NSURL URLWithString:threadImagePath] : Nil;
-    
-    if (threadURL) {
-        [cell.profileImageView sd_setImageWithURL:threadURL];
-    } else {
-        [thread imageForThread].thenOnMain(^id(UIImage * image) {
-            [cell.profileImageView sd_setImageWithURL:threadURL placeholderImage:image];
-            return Nil;
-        }, Nil);
-    }
-    
-    //    cell.unreadView.hidden = !thread.unreadMessageCount;
-    
-    int unreadCount = thread.unreadMessageCount;
-    cell.unreadMessagesLabel.hidden = !unreadCount;
-    cell.unreadMessagesLabel.text = [@(unreadCount) stringValue];
-    
+
     // Add the typing indicator
     NSString * typingText = _threadTypingMessages[thread.entityID];
     if (typingText && typingText.length) {
@@ -233,7 +214,6 @@
 }
 
 -(void) tableView:(UITableView *)tableView_ didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
-    
     id<PThread> thread = _threads[indexPath.row];
     [self pushChatViewControllerWithThread:thread];
     [tableView_ deselectRowAtIndexPath:indexPath animated:YES];
@@ -295,10 +275,36 @@
     return !_slideToDeleteDisabled;
 }
 
--(void) reloadData {
+-(void) reloadDataForThread: (id<PThread>) thread {
+    int index = [_threads indexOfObject:thread];
+    if (index >= 0) {
+        [tableView reloadRowsAtIndexPaths:@[[NSIndexPath indexPathForRow:index inSection:0]] withRowAnimation:UITableViewRowAnimationAutomatic];
+    }
+}
+
+// Load the threads from the database
+// This should be implemented by the super class
+-(void) loadThreads {
+    
+}
+
+// Reload threads, sort and refresh the table view
+-(void) loadThreadsAndReloadData {
+    [self loadThreads];
+    [self reloadData];
+}
+
+// Reload the tableView
+-(void) sortAndReloadData {
     [_threads sortUsingComparator:^(id<PThread>t1, id<PThread> t2) {
         return [t2.orderDate compare:t1.orderDate];
     }];
+
+    [self reloadData];
+}
+
+// Reload the tableView
+-(void) reloadData {
     [tableView reloadData];
 }
 
@@ -308,8 +314,15 @@
 }
 
 -(void) dealloc {
+    [_disposeOnDealloc dispose];
+    [_disposeOnDisappear dispose];
+
     tableView.delegate = Nil;
     tableView.dataSource = Nil;
+}
+
+-(void) updateBadge {
+    
 }
 
 @end

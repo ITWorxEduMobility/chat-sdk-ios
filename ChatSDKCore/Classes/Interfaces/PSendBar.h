@@ -10,7 +10,7 @@
 
 @protocol PSendBarDelegate;
 
-typedef void(^Send)();
+typedef void(^Send)(void);
 
 @protocol PSendBar <NSObject>
 
@@ -22,6 +22,7 @@ typedef void(^Send)();
 -(void) setMaxCharacters: (NSInteger) maxCharacters;
 -(void) setText: (NSString *) text;
 -(NSString *) text;
+-(void) setReadOnly: (BOOL) readonly;
 
 -(void) setSendListener: (Send) listener;
 

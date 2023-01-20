@@ -7,10 +7,21 @@
 
 import Foundation
 
-@objc public protocol User {
+public protocol User : class {
+    func userId() -> String
+    func userName() -> String?
     
-    @objc func userId() -> String
-    @objc func userName() -> String
-    @objc func userImageUrl() -> URL?
+    // You can either provide an image url or an actual image
+    func userImageUrl() -> URL?
+    func userImage() -> UIImage?
+    
+    func userIsMe() -> Bool
+    func userIsOnline() -> Bool
+    func userLastOnline() -> Date?
+}
 
+public extension User {
+    func userLastOnline() -> Date? {
+        return nil
+    }
 }

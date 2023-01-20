@@ -25,8 +25,6 @@
 @synthesize chatMessagesToLoad;
 @synthesize messagesToLoadPerBatch;
 @synthesize pushNotificationSound;
-@synthesize firebaseGoogleServicesPlistName;
-@synthesize firebaseShouldConfigureAutomatically;
 @synthesize locationMessagesEnabled;
 @synthesize imageMessagesEnabled;
 @synthesize googleMapsApiKey;
@@ -54,8 +52,11 @@
 @synthesize disableProfileUpdateOnAuthentication;
 @synthesize developmentModeEnabled;
 @synthesize messageSelectionEnabled;
-
-@synthesize vibrateOnNewMessage;
+@synthesize encryptGroupThreads;
+@synthesize allowUserToRejoinGroup;
+@synthesize legacyCropperEnabled;
+@synthesize timeAgoDateFormat;
+@synthesize allowEmptyBody;
 
 @synthesize showMessageAvatarAtPosition;
 @synthesize messageBubbleMaskFirst;
@@ -70,6 +71,8 @@
 @synthesize inviteBySMSBody;
 @synthesize audioMessageMaxLengthSeconds;
 @synthesize maxImageDimension;
+@synthesize disableSendButtonWhenDisconnected;
+@synthesize disableSendButtonWhenNotReachable;
 
 @synthesize xmppPort;
 @synthesize xmppDomain;
@@ -91,14 +94,36 @@
 @synthesize remote;
 @synthesize remoteConfigEnabled;
 
-@synthesize firebaseApp;
 @synthesize firebaseStorageURL;
 @synthesize firebaseDatabaseURL;
 @synthesize firebaseFunctionsRegion;
 @synthesize enableWebCompatibility;
-@synthesize enableCompatibilityWithV4;
+@synthesize xmppSendPushOnAck;
 
 @synthesize messageDeletionEnabled;
+@synthesize autoSaveOnTerminate;
+@synthesize xmppPingTimeout;
+@synthesize xmppPingInterval;
+@synthesize xmppOutgoingMessageQueueEnabled;
+@synthesize xmppPubsubNode;
+@synthesize identiconBaseURL;
+@synthesize threadDestructionEnabled;
+@synthesize replyThumbnailSize;
+
+@synthesize xmppOutgoingMessageQueueRetryTime;
+@synthesize xmppOutgoingMessageAlwaysAdd;
+@synthesize xmppAutoAcceptIncomingPresenceRequests;
+@synthesize threadUnreadViewBackgroundColor;
+@synthesize threadUnreadViewTextColor;
+
+@synthesize threadCellTypingTextColor;
+@synthesize threadCellLastMessageTextColor;
+
+@synthesize sendBase64ImagePreview;
+@synthesize imagePreviewMaxSize;
+@synthesize imagePreviewQuality;
+@synthesize groupImagesEnabled;
+
 
 -(instancetype) init {
     if((self = [super init])) {
@@ -121,6 +146,9 @@
         remote = [NSMutableDictionary new];
         remoteConfigEnabled = NO;
         
+        disableSendButtonWhenDisconnected = YES;
+        disableSendButtonWhenNotReachable = YES;
+
         timeFormat = @"HH:mm";
         
         anonymousLoginEnabled = YES;
@@ -138,18 +166,20 @@
         chatMessagesToLoad = messagesToLoadPerBatch;
 
         audioMessageMaxLengthSeconds = 300;
-        
-        firebaseShouldConfigureAutomatically = YES;
-        
+                
         locationMessagesEnabled = YES;
         imageMessagesEnabled = YES;
         termsAndConditionsEnabled = YES;
         
         showPublicThreadsUnreadMessageBadge = YES;
+        autoSaveOnTerminate = YES;
+        
+        encryptGroupThreads = YES;
         
         prefersLargeTitles = YES;
         
         forgotPasswordEnabled = YES;
+        legacyCropperEnabled = NO;
         
         databaseVersion = @"1";
         clearDatabaseWhenDataVersionChanges = NO;
@@ -159,15 +189,19 @@
         showLocalNotificationsForPublicChats = NO;
         
         shouldAskForNotificationsPermission = YES;
-        messageSelectionEnabled = YES;
+        messageSelectionEnabled = NO;
                 
         showProfileViewOnTap = YES;
         
         rootPath = @"pre_1";
-                
+//        identiconBaseURL = @"https://identicon.sdk.chat?value=%@&size=400.png";
+        identiconBaseURL = nil;
+
         anonymousLoginEnabled = NO;
         
         userChatInfoEnabled = YES;
+        threadDestructionEnabled = YES;
+        timeAgoDateFormat = @"dd/MM/yy";
         
         maxImageDimension = 600;
         
@@ -180,12 +214,17 @@
         xmppMucMessageHistory = 20;
         xmppAdvancedConfigurationEnabled = YES;
         
-        messageDeletionListenerLimit = 30;
-        messageHistoryDownloadLimit = 30;
+        xmppPingInterval = 15;
+        xmppPingTimeout = 15;
+        
+        messageDeletionListenerLimit = -1;
+        messageHistoryDownloadLimit = 200;
         readReceiptMaxAgeInSeconds = 7 * bDays;
         
         textInputViewMaxCharacters = 0;
         textInputViewMaxLines = 5;
+        
+        allowUserToRejoinGroup = YES;
         
         xmppAuthType = @"default";
 
@@ -197,8 +236,6 @@
         publicChatRoomLifetimeMinutes = 7 * 60 * 24;
         
         searchIndexes = @[bUserNameKey, bUserEmailKey, bUserPhoneKey, bUserNameLowercase];
-        
-        vibrateOnNewMessage = YES;
         
         showMessageAvatarAtPosition = bMessagePosLast;
         
@@ -212,7 +249,29 @@
         
         publicChatAutoSubscriptionEnabled = NO;
         enableWebCompatibility = NO;
-        enableCompatibilityWithV4 = YES;
+        xmppOutgoingMessageQueueEnabled = NO;
+        xmppSendPushOnAck = NO;
+        
+        xmppPubsubNode = @"chatsdk";
+        
+        xmppOutgoingMessageQueueRetryTime = 10;
+        xmppOutgoingMessageAlwaysAdd = true;
+        
+        xmppAutoAcceptIncomingPresenceRequests = true;
+        
+        replyThumbnailSize = 60 * 3;
+        
+        threadUnreadViewBackgroundColor = UIColor.lightGrayColor;
+        threadUnreadViewTextColor = UIColor.blackColor;
+        
+        threadCellTypingTextColor = UIColor.darkGrayColor;
+        threadCellLastMessageTextColor = UIColor.lightGrayColor;
+        
+        sendBase64ImagePreview = true;
+        imagePreviewMaxSize = 80;
+        imagePreviewQuality = 1;
+        
+        groupImagesEnabled = true;
         
     }
     return self;

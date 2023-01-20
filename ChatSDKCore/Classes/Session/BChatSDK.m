@@ -19,10 +19,15 @@
 @synthesize interfaceAdapter = _interfaceAdapter;
 @synthesize storageAdapter = _storageAdapter;
 @synthesize networkAdapter = _networkAdapter;
+@synthesize logger = _logger;
+@synthesize settings = _settings;
+@synthesize modules = _modules;
+@synthesize identifier = _identifier;
+@synthesize notificationHandlers = _notificationHandlers;
 
 static BChatSDK * instance;
 
-+(BChatSDK *) shared {
++(nonnull BChatSDK *) shared {
     
     @synchronized(self) {
         
@@ -36,14 +41,15 @@ static BChatSDK * instance;
 }
 
 -(instancetype) init {
+    
     if((self = [super init])) {
         [[NSNotificationCenter defaultCenter] addObserver:self
-                                                 selector:@selector(appDidResignActive)
+                                                 selector:@selector(appWillResignActive:)
                                                      name:UIApplicationWillResignActiveNotification
                                                    object:Nil];
         
         [[NSNotificationCenter defaultCenter] addObserver:self
-                                                 selector:@selector(appDidBecomeActive)
+                                                 selector:@selector(appDidBecomeActive:)
                                                      name:UIApplicationDidBecomeActiveNotification
                                                    object:Nil];
         
@@ -52,40 +58,98 @@ static BChatSDK * instance;
                                                      name:UIApplicationWillTerminateNotification
                                                    object:Nil];
         _moduleHelper = [BModuleHelper new];
+        _logger = [BLogger new];
+        _notificationHandlers = [NSMutableArray new];
     }
     return self;
 }
 
-+(void) initialize: (BConfiguration *) config app:(UIApplication *)application options:(NSDictionary *)launchOptions interfaceAdapter: (id<PInterfaceAdapter>) adapter {
-    [self.shared initialize:config app:application options:launchOptions interfaceAdapter: adapter];
++(void) initialize: (BConfiguration *) config app:(UIApplication *)application options:(NSDictionary *)launchOptions modules: (NSArray<PModule> *) modules {
+    [self.shared initialize:config app:application options:launchOptions modules: modules networkAdapter: nil interfaceAdapter: nil];
     [self application:application didFinishLaunchingWithOptions:launchOptions];
 }
 
--(void) initialize: (BConfiguration *) config app:(UIApplication *)application options:(NSDictionary *)launchOptions interfaceAdapter: (id<PInterfaceAdapter>) adapter {
-    _configuration = config;
++(void) initialize: (BConfiguration *) config app:(UIApplication *)application options:(NSDictionary *)launchOptions  modules: (NSArray<PModule> *) modules networkAdapter:(id<PNetworkAdapter>)networkAdapter interfaceAdapter:(id<PInterfaceAdapter>)interfaceAdapter {
+    [self.shared initialize:config app:application options:launchOptions modules: modules networkAdapter: networkAdapter interfaceAdapter: interfaceAdapter];
+    [self application:application didFinishLaunchingWithOptions:launchOptions];
+}
+
++(void) activateLicenseWithEmail: (NSString *) email {
+    [self.shared activateLicense:@"email" identifier:email];
+}
+
++(void) activateLicenseWithPatreon: (NSString *) patreonId {
+    [self.shared activateLicense:@"patreon" identifier:patreonId];
+}
+
++(void) activateLicenseWithGithub: (NSString *) githubId {
+    [self.shared activateLicense:@"github" identifier:githubId];
+}
+
+-(void) activateLicense: (NSString *) provider identifier: (NSString *) identifier {
+    _identifier = @[provider, identifier];
+}
+
+-(void) initialize: (BConfiguration *) config app:(UIApplication *)application options:(NSDictionary *)launchOptions  modules: (NSArray<PModule> *) modules networkAdapter:(id<PNetworkAdapter>)networkAdapter interfaceAdapter:(id<PInterfaceAdapter>)interfaceAdapter {
     
-    [_moduleHelper activateCoreModules];
-    if(adapter) {
-        _interfaceAdapter = adapter;
+    self.modules = [modules sortedArrayUsingComparator:^NSComparisonResult(id<PModule> h1, id<PModule> h2) {
+        int w1 = 0;
+        int w2 = 0;
+        if ([h1 respondsToSelector:@selector(weight)]) {
+            w1 = [h1 weight];
+        }
+        if ([h2 respondsToSelector:@selector(weight)]) {
+            w2 = [h2 weight];
+        }
+        return w1 - w2;
+    }];;
+
+    _configuration = config;
+
+    if(interfaceAdapter) {
+        _interfaceAdapter = interfaceAdapter;
     }
-    [_moduleHelper activateModules];
+    if(networkAdapter) {
+        _networkAdapter = networkAdapter;
+    }
+    
+    // Activate the network adapter and interface adapter first
+    for (id<PModule> module in modules) {
+        if ([module respondsToSelector:@selector(getNetworkAdapter)] && !_networkAdapter) {
+            _networkAdapter = [((id<PNetworkAdapterProvider>) module) getNetworkAdapter];
+        }
+        if ([module respondsToSelector:@selector(getInterfaceAdapter)] && !_interfaceAdapter) {
+            _interfaceAdapter = [((id<PInterfaceAdapterProvider>) module) getInterfaceAdapter];
+        }
+    }
+    
+    if (!_interfaceAdapter) {
+        [_moduleHelper activateUIModule];
+    }
+
+    [_moduleHelper activateCoreModules];
+    
+    for (id<PModule> module in modules) {
+        [module activate];
+    }
+    
+//    [_moduleHelper activateModules];
+    
+    _settings = [Settings new];
     
     [self clearDataIfNecessary];
 }
 
-+(void) initialize: (BConfiguration *) config app:(UIApplication *)application options:(NSDictionary *)launchOptions {
-    [self initialize:config app:application options:launchOptions interfaceAdapter:Nil];
-}
-
--(void) appDidResignActive {
-    if(self.networkAdapter) {
-        [self.networkAdapter.core save];
+-(void) appWillResignActive: (NSNotification *) notification {
+    if(self.networkAdapter && BChatSDK.auth.isAuthenticated) {
         [self.networkAdapter.core goOffline];
     }
 }
 
--(void) appDidBecomeActive {
+-(void) appDidBecomeActive: (NSNotification *) notification {
     if(self.networkAdapter) {
+//        [BHookNotification notificationDidBecomeActive: notification.object];
+
         // TODO: Check this
         [self.networkAdapter.core goOnline];
     }
@@ -97,21 +161,7 @@ static BChatSDK * instance;
     }
 }
 
--(BOOL) activateModuleForName: (NSString *) name {
-    return [_moduleHelper activateModuleForName:name];
-}
 
--(void) activateModules {
-    [_moduleHelper activateModules];
-}
-
--(void) activateModulesForFirebase {
-    [_moduleHelper activateModulesForFirebase];
-}
-
--(void) activateModulesForXMPP {
-    [_moduleHelper activateModulesForXMPP];
-}
 
 // If the configuration isn't set, return a default value
 -(BConfiguration *) config {
@@ -146,10 +196,6 @@ static BChatSDK * instance;
     return YES;
 }
 
--(void) preventAutomaticActivationForModule: (NSString *) moduleName {
-    [_moduleHelper excludeModules:@[moduleName]];
-}
-
 // Authenticate using a Firebase token
 +(RXPromise *) authenticateWithToken: (NSString *) token {
     return [BIntegrationHelper authenticateWithToken:token];
@@ -175,11 +221,9 @@ static BChatSDK * instance;
     
     if (BChatSDK.config.clearDataWhenRootPathChanges && rootPath && newRootPath && ![rootPath isEqualToString:newRootPath]) {
         [BChatSDK.db deleteAllData];
-        [BChatSDK.db saveToStore];
     }
     else if (BChatSDK.config.clearDatabaseWhenDataVersionChanges && ![databaseVersion isEqual:newDatabaseVersion]) {
         [BChatSDK.db deleteAllData];
-        [BChatSDK.db saveToStore];
     }
 
     if (newRootPath) {
@@ -270,16 +314,20 @@ static BChatSDK * instance;
     return self.a.stickerMessage;
 }
 
++(id<GifMessageHandler>) gifMessage {
+    return self.a.gifMessage;
+}
+
 +(id<PUsersHandler>) users {
     return self.a.users;
 }
 
 +(id<PUser>) currentUser {
-    return BChatSDK.core.currentUserModel;
+    return self.auth.currentUser;
 }
 
 +(NSString *) currentUserID {
-    return self.currentUser.entityID;
+    return self.auth.currentUserID;
 }
 
 +(BOOL) isMe: (id<PUser>) user {
@@ -300,10 +348,15 @@ static BChatSDK * instance;
 
 +(id<PInterfaceAdapter>) ui {
     return self.shared.interfaceAdapter;
+    
 }
 
 +(id<PStorageAdapter>) db {
     return self.shared.storageAdapter;
+}
+
++(id<CallHandler>) call {
+    return self.a.call;
 }
 
 +(id<PFileMessageHandler>) fileMessage {
@@ -347,4 +400,9 @@ static BChatSDK * instance;
     return _iconsBundle;
 }
 
+-(void) addNotificationHandlers: (id<UNUserNotificationCenterDelegate>) delegate {
+    [_notificationHandlers addObject:delegate];
+}
+
 @end
+

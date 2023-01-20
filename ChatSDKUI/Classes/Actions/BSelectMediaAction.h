@@ -7,12 +7,12 @@
 
 #import <Foundation/Foundation.h>
 #import <ChatSDK/bPictureTypes.h>
-#import <TOCropViewController/TOCropViewController.h>
+#import <CropViewController/TOCropViewController.h>
 #import <ChatSDK/PAction.h>
 
 @class RXPromise;
 
-@interface BSelectMediaAction : NSObject<PAction, UIImagePickerControllerDelegate, TOCropViewControllerDelegate, UINavigationControllerDelegate> {
+@interface BSelectMediaAction: NSObject<PAction, UIImagePickerControllerDelegate, TOCropViewControllerDelegate, UINavigationControllerDelegate> {
     UIImagePickerController * _picker;
     RXPromise * _promise;
     bPictureType _type;
@@ -22,7 +22,11 @@
 @property (nonatomic, readwrite) UIImage * coverImage;
 @property (nonatomic, readwrite) UIImage * photo;
 @property (nonatomic, readwrite) NSData * videoData;
+@property (nonatomic, readwrite) BOOL cropperEnabled;
+@property (nonatomic, readwrite) BOOL squareCrop;
 
 -(instancetype) initWithType: (bPictureType) type viewController: (UIViewController *) controller;
+-(instancetype) initWithType: (bPictureType) type viewController: (UIViewController *) controller squareCrop: (BOOL) enabled;
+-(instancetype) initWithType: (bPictureType) type viewController: (UIViewController *) controller cropEnabled: (BOOL) enabled;
 
 @end
